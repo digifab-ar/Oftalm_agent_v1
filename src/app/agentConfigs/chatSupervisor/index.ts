@@ -1,6 +1,5 @@
 import { RealtimeAgent } from '@openai/agents/realtime';
 import supervisorAgentOptimized from './supervisorAgentOptimized';
-import { sampleData } from './sampleData';
 
 // Usar la versión optimizada con instrucciones modulares (Estrategia 1)
 const supervisorAgent = supervisorAgentOptimized;

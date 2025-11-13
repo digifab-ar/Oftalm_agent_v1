@@ -20,8 +20,7 @@
 import { RealtimeAgent, tool } from '@openai/agents/realtime';
 import { 
   INSTRUCCIONES_BASE, 
-  obtenerInstruccionesEtapa,
-  construirInstruccionesCompletas 
+  obtenerInstruccionesEtapa
 } from './instructionsModular';
 
 const supervisorAgentDynamic = new RealtimeAgent({
