@@ -74,21 +74,21 @@ function Transcript({
     <div className="flex flex-col flex-1 bg-white min-h-0 rounded-xl">
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between px-6 py-3 sticky top-0 z-10 text-base border-b bg-white rounded-t-xl">
-          <span className="font-semibold">Transcript</span>
+          <span className="font-semibold">Conversación</span>
           <div className="flex gap-x-2">
             <button
               onClick={handleCopyTranscript}
               className="w-24 text-sm px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 flex items-center justify-center gap-x-1"
             >
               <ClipboardCopyIcon />
-              {justCopied ? "Copied!" : "Copy"}
+              {justCopied ? "Copiado!" : "Copiar"}
             </button>
             <button
               onClick={downloadRecording}
               className="w-40 text-sm px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 flex items-center justify-center gap-x-1"
             >
               <DownloadIcon />
-              <span>Download Audio</span>
+              <span>Descargar Audio</span>
             </button>
           </div>
         </div>
@@ -222,7 +222,7 @@ function Transcript({
             }
           }}
           className="flex-1 px-4 py-2 focus:outline-none"
-          placeholder="Type a message..."
+          placeholder="Escribe un mensaje..."
         />
         <button
           onClick={onSendMessage}

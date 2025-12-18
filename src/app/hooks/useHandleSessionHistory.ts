@@ -33,7 +33,9 @@ export function useHandleSessionHistory() {
 
   const extractFunctionCallByName = (name: string, content: any[] = []): any => {
     if (!Array.isArray(content)) return undefined;
-    return content.find((c: any) => c.type === 'function_call' && c.name === name);
+    // Buscar la ÚLTIMA llamada (no la primera) para obtener los valores actuales
+    const allCalls = content.filter((c: any) => c.type === 'function_call' && c.name === name);
+    return allCalls.length > 0 ? allCalls[allCalls.length - 1] : undefined;
   };
 
   const maybeParseJson = (val: any) => {
@@ -74,7 +76,7 @@ export function useHandleSessionHistory() {
 
     addTranscriptBreadcrumb(
       `function call: ${function_name}`,
-      function_args
+      maybeParseJson(function_args)  // Parsear JSON para formato legible
     );    
   }
   function handleAgentToolEnd(details: any, _agent: any, _functionCall: any, result: any) {

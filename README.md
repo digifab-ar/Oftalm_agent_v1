@@ -1,8 +1,61 @@
-# Realtime API Agents Demo
+# Sistema de Examen Visual con Agente AI
 
-This is a demonstration of more advanced patterns for voice agents, using the OpenAI Realtime API and the OpenAI Agents SDK. 
+Este proyecto implementa un sistema de examen visual oftalmológico automatizado mediante un agente de inteligencia artificial que conversa con el paciente y un backend que orquesta la lógica del examen, controlando dispositivos físicos (foróptero digital y pantalla/TV) mediante HTTP POST y MQTT.
 
-## About the OpenAI Agents SDK
+## 📋 Resumen
+
+**Objetivo:** Realizar un examen visual completo mediante conversación natural entre un agente AI y el paciente, donde el backend maneja toda la lógica del examen y ejecuta automáticamente los comandos de dispositivos.
+
+### Componentes Principales
+
+- **Frontend (Next.js):** Interfaz web con OpenAI Realtime API y agente AI conversacional
+- **Backend (Express + MQTT):** Servidor que orquesta la lógica del examen y controla dispositivos
+- **Agente AI:** Conversa con el paciente e interpreta respuestas
+- **Dispositivos:** Foróptero digital (ESP32) y pantalla/TV para mostrar letras Sloan
+
+### Estado Actual
+
+✅ **Implementado:**
+- ETAPA_1: Recolección de valores iniciales del autorefractómetro
+- ETAPA_2: Recálculo cilíndrico según protocolo clínico
+- ETAPA_3: Generación de secuencia del examen y preparación
+- ETAPA_4: Test de agudeza visual inicial (parcial)
+
+❌ **Falta Implementar:**
+- ETAPA_5: Tests de lentes (esférico grueso, esférico fino, cilíndrico, cilíndrico ángulo)
+- Agudeza alcanzada (después de todos los tests de lentes)
+- Finalización del examen
+
+## 📚 Documentación
+
+Para documentación completa del sistema, ver:
+- **[DOCUMENTACION.md](./DOCUMENTACION.md)** - Documentación completa del sistema
+- **[reference/foroptero-server/README.md](./reference/foroptero-server/README.md)** - Documentación del backend
+
+## 🚀 Inicio Rápido
+
+### Setup
+
+- This is a Next.js typescript app. Install dependencies with `npm i`.
+- Add your `OPENAI_API_KEY` to your env. Either add it to your `.bash_profile` or equivalent, or copy `.env.sample` to `.env` and add it there.
+- Start the server with `npm run dev`
+- Open your browser to [http://localhost:3000](http://localhost:3000). It should default to the `chatSupervisor` Agent Config.
+
+### Backend
+
+El backend está desplegado en Railway:
+- **URL:** `https://foroptero-production.up.railway.app`
+- **Endpoints:** Ver [DOCUMENTACION.md](./DOCUMENTACION.md) para lista completa
+
+## 🏗️ Arquitectura
+
+```
+Frontend (Next.js) → Backend (Express + MQTT) → Dispositivos (Foróptero + TV)
+```
+
+El agente AI solo conversa con el paciente. El backend ejecuta automáticamente todos los comandos de dispositivos (foróptero y TV) mediante MQTT.
+
+## 📖 Sobre el OpenAI Agents SDK
 
 This project uses the [OpenAI Agents SDK](https://github.com/openai/openai-agents-js), a toolkit for building, managing, and deploying advanced AI agents. The SDK provides:
 
@@ -15,17 +68,14 @@ For full documentation, guides, and API references, see the official [OpenAI Age
 
 **NOTE:** For a version that does not use the OpenAI Agents SDK, see the [branch without-agents-sdk](https://github.com/openai/openai-realtime-agents/tree/without-agents-sdk).
 
-There are two main patterns demonstrated:
+## 📝 Patrones de Agentes Demostrados
+
+Este proyecto también incluye ejemplos de patrones avanzados de agentes de voz (del proyecto original):
+
 1. **Chat-Supervisor:** A realtime-based chat agent interacts with the user and handles basic tasks, while a more intelligent, text-based supervisor model (e.g., `gpt-4.1`) is used extensively for tool calls and more complex responses. This approach provides an easy onramp and high-quality answers, with a small increase in latency.
 2. **Sequential Handoff:** Specialized agents (powered by realtime api) transfer the user between them to handle specific user intents. This is great for customer service, where user intents can be handled sequentially by specialist models that excel in a specific domains. This helps avoid the model having all instructions and tools in a single agent, which can degrade performance.
 
-## Setup
-
-- This is a Next.js typescript app. Install dependencies with `npm i`.
-- Add your `OPENAI_API_KEY` to your env. Either add it to your `.bash_profile` or equivalent, or copy `.env.sample` to `.env` and add it there.
-- Start the server with `npm run dev`
-- Open your browser to [http://localhost:3000](http://localhost:3000). It should default to the `chatSupervisor` Agent Config.
-- You can change examples via the "Scenario" dropdown in the top right.
+You can change examples via the "Scenario" dropdown in the top right.
 
 # Agentic Pattern 1: Chat-Supervisor
 

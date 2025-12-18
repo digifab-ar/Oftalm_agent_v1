@@ -41,8 +41,8 @@ function BottomToolbar({
   };
 
   function getConnectionButtonLabel() {
-    if (isConnected) return "Disconnect";
-    if (isConnecting) return "Connecting...";
+    if (isConnected) return "Desconectado";
+    if (isConnecting) return "Conectando...";
     return "Connect";
   }
 
@@ -81,7 +81,7 @@ function BottomToolbar({
           htmlFor="push-to-talk"
           className="flex items-center cursor-pointer"
         >
-          Push to talk
+          Pulsa para hablar
         </label>
         <button
           onMouseDown={handleTalkButtonDown}
@@ -95,7 +95,7 @@ function BottomToolbar({
             (!isPTTActive ? " bg-gray-100 text-gray-400" : "")
           }
         >
-          Talk
+          Hablar
         </button>
       </div>
 
@@ -112,7 +112,7 @@ function BottomToolbar({
           htmlFor="audio-playback"
           className="flex items-center cursor-pointer"
         >
-          Audio playback
+          Reproducir Audio
         </label>
       </div>
 

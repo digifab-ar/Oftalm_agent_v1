@@ -441,15 +441,15 @@ function App() {
         >
           <div>
             <Image
-              src="/openai-logomark.svg"
-              alt="OpenAI Logo"
+              src="/DigiFab.svg"
+              alt="DigiFab Logo"
               width={20}
               height={20}
               className="mr-2"
             />
           </div>
           <div>
-            Realtime API <span className="text-gray-500">Agents</span>
+            Oftalmólogo <span className="text-gray-500">AI</span>
           </div>
         </div>
         <div className="flex items-center">
