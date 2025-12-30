@@ -99,7 +99,7 @@ function BottomToolbar({
         </button>
       </div>
 
-      <div className="flex flex-row items-center gap-1">
+      <div className="flex flex-row items-center gap-1 hidden">
         <input
           id="audio-playback"
           type="checkbox"
