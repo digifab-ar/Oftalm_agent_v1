@@ -129,7 +129,7 @@ function BottomToolbar({
         </label>
       </div>
 
-      <div className="flex flex-row items-center gap-2">
+      <div className="flex flex-row items-center gap-2 hidden">
         <div>Codec:</div>
         {/*
           Codec selector – Lets you force the WebRTC track to use 8 kHz 
