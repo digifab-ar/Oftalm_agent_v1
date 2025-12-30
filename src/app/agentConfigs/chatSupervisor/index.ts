@@ -30,7 +30,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 5. Después de hablar, espera la respuesta del paciente
 6. Cuando el paciente responda:
    - **Si estás en test de agudeza visual (ETAPA_4):** Interpreta la respuesta y llama \`obtenerEtapa(respuestaPaciente, interpretacionAgudeza)\` con la interpretación estructurada
-   - **Si estás en test de comparación de lentes (ETAPA_5):** Interpreta la preferencia y llama \`obtenerEtapa(respuestaPaciente, null, interpretacionComparacion)\` con la interpretación estructurada
+   - **Si estás en test de comparación de lentes (ETAPA_5) o test binocular (ETAPA_6):** Interpreta la preferencia y llama \`obtenerEtapa(respuestaPaciente, null, interpretacionComparacion)\` con la interpretación estructurada
    - **Si no estás en agudeza ni comparación:** Llama \`obtenerEtapa(respuestaPaciente)\` con su respuesta
 7. El backend procesará la respuesta, ejecutará comandos automáticamente, y te dará nuevos pasos de "hablar"
 8. Repite desde el paso 4
@@ -51,7 +51,7 @@ obtenerEtapa con respuestaPaciente: "H" e interpretacionAgudeza: { resultado: "c
 
 # Interpretación de Respuestas de Comparación de Lentes
 
-Cuando estás en un test de comparación de lentes (el backend te indica que estás en ETAPA_5), debes interpretar la preferencia del paciente y enviar un formato estructurado:
+Cuando estás en un test de comparación de lentes (el backend te indica que estás en ETAPA_5) o en test binocular (ETAPA_6), debes interpretar la preferencia del paciente y enviar un formato estructurado:
 
 Formato de interpretación:
 - Si el paciente prefiere el lente anterior (ej: "Con el anterior", "El otro", "El primero") → preferencia: "anterior"
@@ -70,12 +70,6 @@ obtenerEtapa con respuestaPaciente: "Con el anterior" e interpretacionComparacio
 - **No expliques procesos** - solo habla de forma natural
 - **No guardes estado** - el backend maneja todo
 
-# Comandos Especiales
-
-Si el paciente solicita reiniciar el examen o empezar de nuevo (en cualquier forma: "reiniciar test", "empezar de nuevo", "volver al principio", "borrar todo", etc.):
-- **DEBES usar la tool \`reiniciarExamen()\`** para reiniciar el examen
-- El backend reiniciará todo (valores en null, vuelve a etapa 1) y te dará pasos para pedir los valores iniciales nuevamente
-- **NO envíes su respuesta a \`obtenerEtapa()\`** si es un comando de reinicio - usa directamente \`reiniciarExamen()\`
 `;
 
 export const chatAgent = new RealtimeAgent({
@@ -88,7 +82,7 @@ export const chatAgent = new RealtimeAgent({
     // y solo retorna pasos de tipo "hablar" para que el agente ejecute
     tool({
       name: 'obtenerEtapa',
-      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en test de comparación de lentes (ETAPA_5), también incluye interpretacionComparacion con la interpretación estructurada de la preferencia.',
+      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en test de comparación de lentes (ETAPA_5) o test binocular (ETAPA_6), también incluye interpretacionComparacion con la interpretación estructurada de la preferencia.',
       parameters: {
         type: 'object',
         properties: {
@@ -119,7 +113,7 @@ export const chatAgent = new RealtimeAgent({
           interpretacionComparacion: {
             type: 'object',
             nullable: true,
-            description: 'Interpretación estructurada de la respuesta del paciente en test de comparación de lentes. Solo incluir si estás en ETAPA_5 y el paciente acaba de responder sobre su preferencia de lentes.',
+            description: 'Interpretación estructurada de la respuesta del paciente en test de comparación de lentes o test binocular. Solo incluir si estás en ETAPA_5 o ETAPA_6 y el paciente acaba de responder sobre su preferencia de lentes.',
             properties: {
               preferencia: {
                 type: 'string',
@@ -209,34 +203,7 @@ export const chatAgent = new RealtimeAgent({
       }
     }),
 
-    // Tool 3: Reiniciar examen
-    tool({
-      name: 'reiniciarExamen',
-      description: 'Reinicia el examen desde el principio. Úsala cuando el paciente lo solicite o cuando sea necesario empezar de nuevo.',
-      parameters: {
-        type: 'object',
-        properties: {},
-        required: [],
-        additionalProperties: false
-      },
-      execute: async () => {
-        try {
-          const response = await fetch('https://foroptero-production.up.railway.app/api/examen/reiniciar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (!response.ok) {
-            return { ok: false, msg: `Error del servidor: ${response.statusText}` };
-          }
-          
-          const data = await response.json();
-          return data;
-        } catch (error: any) {
-          return { ok: false, msg: `Error de conexión: ${error.message}` };
-        }
-      }
-    }),
+
   ],
   handoffs: []
 });

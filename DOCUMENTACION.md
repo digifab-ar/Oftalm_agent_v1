@@ -154,15 +154,21 @@ Configuración del agente AI conversacional.
 - Validación de formato y rangos
 - Guarda valores en `estadoExamen.valoresIniciales`
 
-#### **ETAPA_2: Recálculo Cilíndrico**
+#### **ETAPA_2: Recálculo Cilíndrico y Esférico**
 **Estado:** ✅ Implementado (silencioso)
 
-- Aplica reglas de recálculo cilíndrico según protocolo clínico
-- Reglas:
+- Aplica reglas de recálculo cilíndrico y esférico según protocolo clínico
+- **Recálculo Cilíndrico:**
   - Cilindro entre -0.50 y -2.00 → sumar +0.50
   - Cilindro entre -2.25 y -4.00 → sumar +0.75
   - Cilindro entre -4.25 y -6.00 → sumar +1.50
   - Cilindro = 0 o -0.25 → mantener igual
+- **Recálculo Esférico:**
+  - Valores negativos → mantener igual
+  - Hasta +1.25 inclusive → mantener igual
+  - Entre +1.50 a +3.00 inclusive → restar 0.50
+  - Entre +3.25 a +4.50 inclusive → restar 0.75
+  - Desde +4.75 en adelante → restar 1.00
 - Guarda valores recalculados en `estadoExamen.valoresRecalculados`
 - No genera pasos visibles (etapa silenciosa)
 
@@ -179,16 +185,18 @@ Configuración del agente AI conversacional.
 - Transición a ETAPA_4
 
 #### **ETAPA_4: Test de Agudeza Visual**
-**Estado:** ✅ Implementado parcialmente
+**Estado:** ✅ Implementado completamente
 
 **Implementado:**
 - Test de agudeza visual inicial para cada ojo
+- Test de agudeza visual alcanzada para cada ojo (después de tests de lentes)
 - Navegación logMAR con algoritmo de confirmación
 - Generación de letras Sloan diferentes
 - Procesamiento de respuestas del paciente
 - Confirmación con 2 respuestas correctas en el mismo logMAR
+- **Cambio de ojo:** Detección y configuración automática del foróptero al cambiar de ojo (R → L) en `agudeza_inicial`
 
-**Algoritmo de Agudeza:**
+**Algoritmo de Agudeza Inicial:**
 1. Inicia con logMAR 0.4 y letra 'H'
 2. Si respuesta correcta:
    - Si es el mismo logMAR que el último correcto → incrementar confirmaciones
@@ -199,8 +207,27 @@ Configuración del agente AI conversacional.
    - Si no hay último correcto → subir logMAR
 4. Generar nueva letra Sloan diferente
 
-**Falta implementar:**
-- Test de agudeza alcanzada (después de todos los tests de lentes)
+**Algoritmo de Agudeza Alcanzada:**
+1. Empieza desde `agudeza_inicial` (no desde `agudeza_inicial - 0.1`)
+2. Configura foróptero con valores finales optimizados (esfera fino + cilindro + ángulo)
+3. Si respuesta correcta:
+   - Si es el mismo logMAR que el último correcto → incrementar confirmaciones
+   - Si hay 2 confirmaciones y está en 0.0 → guardar y terminar
+   - Si hay 2 confirmaciones y NO está en 0.0 → bajar al siguiente logMAR más pequeño
+   - Si es nuevo logMAR → incrementar confirmaciones
+4. Si respuesta incorrecta:
+   - Volver al logMAR anterior donde sí veía
+   - Confirmar 2 veces en ese logMAR
+5. Generar nueva letra Sloan diferente
+6. **Navegación solo hacia abajo:** 0.4 → 0.3 → 0.2 → 0.1 → 0.0 (nunca sube más allá de `agudeza_inicial`)
+
+**Cambio de Ojo (agudeza_inicial):**
+- Al completar `agudeza_alcanzada` R y pasar a `agudeza_inicial` L:
+  - Detecta cambio de ojo comparando con el test anterior de la secuencia
+  - Configura automáticamente el foróptero con valores recalculados de L
+  - Cambia oclusión: R close, L open
+  - Espera a que el foróptero esté ready antes de mostrar TV
+  - Informa al paciente del cambio de ojo
 
 #### **ETAPA_5: Tests de Lentes**
 **Estado:** ✅ Implementado completamente
@@ -300,7 +327,7 @@ Configuración del agente AI conversacional.
 3. ✅ Lente esférico fino
 4. ✅ Lente cilíndrico *(opcional)*
 5. ✅ Lente cilíndrico ángulo *(opcional)*
-6. ❌ Agudeza visual alcanzada
+6. ✅ Agudeza visual alcanzada
 
 **Ojo Izquierdo (L):**
 7. ✅ Agudeza visual inicial
@@ -308,7 +335,7 @@ Configuración del agente AI conversacional.
 9. ✅ Lente esférico fino
 10. ✅ Lente cilíndrico *(opcional)*
 11. ✅ Lente cilíndrico ángulo *(opcional)*
-12. ❌ Agudeza visual alcanzada
+12. ✅ Agudeza visual alcanzada
 
 **Binocular:**
 13. ❌ Binocular *(opcional - no implementado)*
@@ -490,9 +517,10 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
    - ✅ Funciones internas para ejecución automática
    - ✅ Comunicación MQTT con dispositivos
    - ✅ ETAPA_1: Recolección de valores iniciales
-   - ✅ ETAPA_2: Recálculo cilíndrico
+   - ✅ ETAPA_2: Recálculo cilíndrico y esférico
    - ✅ ETAPA_3: Generación de secuencia y preparación
-   - ✅ ETAPA_4: Test de agudeza visual inicial (parcial - falta agudeza alcanzada)
+   - ✅ ETAPA_4: Test de agudeza visual inicial (completo)
+   - ✅ ETAPA_4: Test de agudeza visual alcanzada (completo y probado)
    - ✅ ETAPA_5: Test de lente esférico grueso (completo y probado)
    - ✅ ETAPA_5: Test de lente esférico fino (completo y probado)
    - ✅ ETAPA_5: Test de lente cilíndrico (completo y probado)
@@ -520,7 +548,10 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
    - ✅ Lente cilíndrico ángulo (completo y probado)
 
 2. **Agudeza Alcanzada**
-   - ❌ Test de agudeza después de todos los tests de lentes (por ojo)
+   - ✅ Test de agudeza después de todos los tests de lentes (por ojo) - **IMPLEMENTADO**
+   - ✅ Navegación progresiva solo hacia abajo desde `agudeza_inicial` hasta 0.0
+   - ✅ Configuración de foróptero con valores finales optimizados
+   - ✅ Sistema de confirmación doble (2 confirmaciones por logMAR)
 
 3. **Finalización**
    - ❌ Mensaje final del examen
@@ -615,15 +646,20 @@ curl https://foroptero-production.up.railway.app/api/pantalla
 - **FASE 1 (2025-01-27):** Backend ejecuta comandos automáticamente
 - **FASE 2 (2025-01-27):** Agente simplificado (eliminación de tools de dispositivos)
 - **ETAPA_3 (2025-01-27):** Generación de secuencia del examen
-- **ETAPA_4 (2025-01-27):** Test de agudeza visual inicial (parcial - falta agudeza alcanzada)
+- **ETAPA_4 (2025-01-27):** Test de agudeza visual inicial (completo)
+- **ETAPA_4 (2025-01-27):** Test de agudeza visual alcanzada (completo y probado)
 - **FASE 4 (2025-11-19):** Test de lente esférico grueso (completo y probado)
 - **FASE 5 (2025-01-27):** Test de lente esférico fino (completo y probado)
 - **FASE 5 (2025-01-27):** Test de lente cilíndrico (completo y probado)
 - **FASE 5 (2025-01-27):** Test de lente cilíndrico ángulo (completo y probado)
 - **Bug Fix (2025-01-27):** Corrección del sistema de confirmación en esférico fino - ahora incrementa correctamente las confirmaciones en lugar de resetearlas, evitando comparaciones duplicadas
 - **Bug Fix (2025-01-27):** Corrección en `determinarTestsActivos()` - las comparaciones para rangos negativos estaban invertidas, impidiendo que el test cilíndrico se incluyera en la secuencia cuando correspondía
+- **Feature (2025-01-27):** Recálculo esférico implementado en ETAPA_2 - Ahora se recalculan tanto los valores cilíndricos como los esféricos según protocolo clínico
+- **Bug Fix (2025-01-27):** Corrección de cambio de ojo en `agudeza_inicial` - Al pasar de `agudeza_alcanzada` R a `agudeza_inicial` L, ahora detecta correctamente el cambio de ojo usando el test anterior de la secuencia (en lugar del estado reseteado) y configura automáticamente el foróptero con valores recalculados, cambia la oclusión (R: close, L: open) y espera a que el foróptero esté ready antes de mostrar TV
+- **Bug Fix (2025-01-27):** Corrección de agudeza alcanzada saltada - El sistema saltaba el test de `agudeza_alcanzada` después de completar tests de lentes. Solución implementada en 3 partes: (1) Mejora de condición de inicialización para distinguir entre tipos de test cuando es el mismo ojo, (2) Verificación de tipo de test específico en confirmación (no solo si hay algún test confirmado), (3) Reset del estado de agudeza al avanzar de lentes a agudeza. Ahora `agudeza_alcanzada` se ejecuta correctamente después de todos los tests de lentes.
+- **Feature (2025-01-27):** Implementación completa de `agudeza_alcanzada` - Test de agudeza visual alcanzada implementado completamente con navegación progresiva solo hacia abajo, configuración de foróptero con valores finales optimizados, y sistema de confirmación doble. Funciona correctamente para ambos ojos (R y L).
 
 ---
 
 **Última actualización:** 2025-01-27  
-**Estado:** Implementación parcial - Todos los tests de lentes completados (esférico grueso, fino, cilíndrico y cilíndrico ángulo). Pendiente: agudeza alcanzada y finalización
+**Estado:** Implementación casi completa - Todos los tests de lentes completados (esférico grueso, fino, cilíndrico y cilíndrico ángulo). Agudeza alcanzada implementada y corregida. Recálculo esférico implementado. Cambio de ojo en `agudeza_inicial` corregido. Pendiente: finalización y refinamientos

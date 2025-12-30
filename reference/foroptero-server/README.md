@@ -230,13 +230,16 @@ El archivo `motorExamen.js` contiene la lógica completa del examen visual imple
 **Etapas:**
 - `INICIO` - Estado inicial
 - `ETAPA_1` - Recolección de valores iniciales del autorefractómetro
-- `ETAPA_2` - Recálculo cilíndrico (silencioso)
+- `ETAPA_2` - Recálculo cilíndrico y esférico (silencioso)
+  - Aplica reglas de recálculo según protocolo clínico
+  - Recálculo esférico: valores negativos se mantienen igual, valores positivos según rangos específicos
+  - Recálculo cilíndrico: aplica ajustes según rangos de valores
 - `ETAPA_3` - Generación de secuencia y preparación
 - `ETAPA_4` - Test de agudeza visual inicial
-- `ETAPA_5` - Tests de lentes (no implementado aún)
+- `ETAPA_5` - Tests de lentes (esférico grueso, fino, cilíndrico, cilíndrico ángulo)
 - `FINALIZADO` - Examen completado
 
-**Estado actual:** ETAPA_4 parcialmente implementada. Falta implementar ETAPA_5 (tests de lentes).
+**Estado actual:** ETAPA_2 completamente implementada (recálculo esférico y cilíndrico). ETAPA_4 parcialmente implementada (agudeza inicial completa, falta agudeza alcanzada). ETAPA_5 completamente implementada (todos los tests de lentes).
 
 ## Notas
 

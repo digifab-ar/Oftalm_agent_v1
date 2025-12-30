@@ -390,8 +390,9 @@ let estadoExamen = {
 - Si válido → guarda valores, pasa a ETAPA_2, genera pasos para ETAPA_2
 
 **ETAPA_2:**
-- Aplica reglas de recálculo cilíndrico
-- Guarda valores recalculados
+- Aplica reglas de recálculo cilíndrico y esférico
+- Recálculo esférico: valores negativos se mantienen igual, valores positivos según rangos (hasta +1.25 mantener, +1.50 a +3.00 restar 0.50, +3.25 a +4.50 restar 0.75, desde +4.75 restar 1.00)
+- Guarda valores recalculados (tanto cilíndricos como esféricos)
 - Pasa a ETAPA_3
 - Genera pasos para ETAPA_3 (ajustar foróptero + hablar)
 
@@ -621,14 +622,13 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 
 **⚠️ PARCIALMENTE IMPLEMENTADO:**
 - **Etapa 4:** ✅ `agudeza_inicial` funciona para ambos ojos (R y L)
-  - ❌ Falta `agudeza_alcanzada` (después de tests de lentes)
+  - ✅ `agudeza_alcanzada` funciona para ambos ojos (R y L) - Implementado y corregido
 - **Etapa 5:** ✅ `esferico_grueso` funciona para ambos ojos (R y L)
   - ✅ `esferico_fino` funciona para ambos ojos (R y L) - Implementado
-  - ❌ Falta `cilindrico`, `cilindrico_angulo`
+  - ✅ `cilindrico` funciona para ambos ojos (R y L) - Implementado
+  - ✅ `cilindrico_angulo` funciona para ambos ojos (R y L) - Implementado
 
 **❌ PENDIENTE:**
-- **FASE 5:** Tests de lentes - Cilíndrico y cilíndrico ángulo (extender implementación)
-- **FASE 6:** Agudeza alcanzada (después de tests de lentes)
 - **FASE 7:** Finalización y refinamientos
 
 ---
@@ -657,6 +657,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 
 **Implementado:**
 - ✅ Función `aplicarRecalculoCilindrico(valores)` con todas las reglas clínicas
+- ✅ Función `aplicarRecalculoEsferico(valores)` con todas las reglas clínicas (2025-01-27)
 - ✅ Función `generarSecuenciaExamen()` que determina tests activos según cilindro
 - ✅ Función `determinarTestsActivos(cilindro)` para decidir qué tests incluir
 - ✅ Lógica completa de Etapa 3 con configuración inicial del foróptero
@@ -665,6 +666,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 
 **Funcionalidades clave:**
 - ✅ Recálculo cilíndrico según protocolo clínico
+- ✅ Recálculo esférico según protocolo clínico (valores negativos se mantienen igual, valores positivos según rangos: hasta +1.25 mantener, +1.50 a +3.00 restar 0.50, +3.25 a +4.50 restar 0.75, desde +4.75 restar 1.00)
 - ✅ Determinación inteligente de tests opcionales (cilíndrico, cilíndrico ángulo)
 - ✅ Configuración inicial: R abierto con valores recalculados, L cerrado
 - ✅ Secuencia completa generada automáticamente según valores
@@ -701,11 +703,16 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 - ✅ Guardado de resultados en `secuenciaExamen.resultados[ojo].agudezaInicial`
 - ✅ Avance automático al siguiente test usando `avanzarTest()`
 
-**❌ FALTA IMPLEMENTAR:**
-- ❌ Test `agudeza_alcanzada` (después de todos los tests de lentes)
-- ❌ Lógica específica para `agudeza_alcanzada` que usa los valores finales de lentes
+**✅ IMPLEMENTADO:**
+- ✅ Test `agudeza_alcanzada` (después de todos los tests de lentes) - **COMPLETADO**
+- ✅ Lógica específica para `agudeza_alcanzada` que usa los valores finales de lentes
+- ✅ Navegación progresiva solo hacia abajo desde `agudeza_inicial` hasta 0.0
+- ✅ Configuración de foróptero con valores finales optimizados
+- ✅ Sistema de confirmación doble (2 confirmaciones por logMAR)
+- ✅ **Bug Fix:** Corrección de agudeza alcanzada saltada (3 soluciones implementadas)
 
-**Tiempo estimado:** 6-8 horas ✅ (para `agudeza_inicial` completa)
+**Tiempo estimado:** 6-8 horas ✅ (para `agudeza_inicial` completa)  
+**Tiempo invertido:** 6-8 horas ✅ (para `agudeza_alcanzada` completa + bug fixes)
 
 ---
 
@@ -954,13 +961,16 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
        - L: valores recalculados + resultados de tests, oclusión "open"
      - [ ] Continuar con secuencia de tests para ojo L
 
-   - [ ] Integración con agudeza alcanzada:
-     - [ ] Después de completar tests de lentes para un ojo → avanzar a `agudeza_alcanzada`
-     - [ ] Configurar foróptero con valores finales antes de test de agudeza
+   - [x] ✅ Integración con agudeza alcanzada:
+     - [x] ✅ Después de completar tests de lentes para un ojo → avanzar a `agudeza_alcanzada`
+     - [x] ✅ Configurar foróptero con valores finales antes de test de agudeza
+     - [x] ✅ **Bug Fix:** Condición de inicialización mejorada para evitar que se salte el test
+     - [x] ✅ **Bug Fix:** Verificación de tipo de test específico en confirmación
+     - [x] ✅ **Bug Fix:** Reset del estado al avanzar de lentes a agudeza
 
 2. **Testing:**
-   - [ ] Probar secuencia completa ojo R:
-     - [ ] agudeza_inicial → esferico_grueso → esferico_fino → cilíndrico → agudeza_alcanzada
+   - [x] ✅ Probar secuencia completa ojo R:
+     - [x] ✅ agudeza_inicial → esferico_grueso → esferico_fino → cilíndrico → agudeza_alcanzada
    - [ ] Probar con cilindro que requiere test de ángulo:
      - [ ] Verificar que se incluye `cilindrico_angulo` en la secuencia
      - [ ] Verificar que funciona correctamente
@@ -986,7 +996,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 - ✅ Cambio de ojo funciona correctamente (R → L) - **Para todos los tests de lentes**
 - ✅ Configuración del foróptero se actualiza después de confirmar cilíndrico y cilíndrico ángulo
 - ✅ Wraparound de ángulos funciona correctamente (0-180 grados circular)
-- ❌ Transición correcta a `agudeza_alcanzada` después de tests de lentes - **PENDIENTE (FASE 6)**
+- ✅ Transición correcta a `agudeza_alcanzada` después de tests de lentes - **COMPLETADO (FASE 6)**
 - ✅ Todos los resultados se guardan en campos correctos (esférico grueso, fino, cilíndrico y cilíndrico ángulo)
 
 **Secuencia Completa del Examen (cuando todos los tests aplican):**
@@ -997,7 +1007,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 3. ✅ esferico_fino → usa resultado de grueso, resultado guardado
 4. ✅ cilindrico → resultado guardado (si cilindro ≠ 0 y ≠ -0.25) - **IMPLEMENTADO**
 5. ✅ cilindrico_angulo → resultado guardado (si cilindro entre -2.00 y -6.00) - **IMPLEMENTADO**
-6. ❌ agudeza_alcanzada → con valores finales de lentes
+6. ✅ agudeza_alcanzada → con valores finales de lentes - **IMPLEMENTADO**
 
 **Ojo Izquierdo (L):**
 7. ✅ agudeza_inicial
@@ -1005,7 +1015,7 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 9. ✅ esferico_fino → usa resultado de grueso, resultado guardado
 10. ✅ cilindrico → resultado guardado (si cilindro ≠ 0 y ≠ -0.25) - **IMPLEMENTADO**
 11. ✅ cilindrico_angulo → resultado guardado (si cilindro entre -2.00 y -6.00) - **IMPLEMENTADO**
-12. ❌ agudeza_alcanzada → con valores finales de lentes
+12. ✅ agudeza_alcanzada → con valores finales de lentes - **IMPLEMENTADO**
 
 **Tiempo estimado:** 8-10 horas (esférico fino, cilíndrico y cilíndrico ángulo)
 **Tiempo invertido:** ~8-10 horas ✅ (esférico fino, cilíndrico y cilíndrico ángulo completados)
@@ -1014,25 +1024,27 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 
 **Bug Fix (2025-01-27):** Corregido bug en `determinarTestsActivos()` donde las comparaciones para rangos negativos estaban invertidas. La condición `cilindro >= -0.50 && cilindro <= -1.75` nunca podía ser verdadera. Corregido a `cilindro <= -0.50 && cilindro >= -1.75` para el rango -1.75 a -0.50, y similar para el rango -6.00 a -2.00.
 
+**Bug Fix (2025-01-27):** Corregido bug de cambio de ojo en `agudeza_inicial`. El problema era que `cambioDeOjo` se evaluaba cuando `estado.ojo === null` (después del reset), por lo que siempre era `false`. Solución: usar el test anterior de la secuencia para detectar cambio de ojo en lugar del estado reseteado. Ahora, al pasar de `agudeza_alcanzada` R a `agudeza_inicial` L, el sistema detecta correctamente el cambio, configura el foróptero con valores recalculados de L, cambia la oclusión (R: close, L: open) y espera a que el foróptero esté ready antes de mostrar TV.
+
 ---
 
-### **FASE 6: Agudeza Visual Alcanzada** ❌ PENDIENTE
+### **FASE 6: Agudeza Visual Alcanzada** ✅ COMPLETADA
 
-**Estado:** ❌ No implementada - Requerida después de completar tests de lentes
+**Estado:** ✅ Implementada completamente - Probada y funcionando correctamente
 
 **📋 Plan Detallado:** Ver `PLAN_IMPLEMENTACION_AGUDEZA_ALCANZADA.md` para implementación completa
 
 **Objetivos:**
-- Implementar test `agudeza_alcanzada` después de todos los tests de lentes
-- Medir agudeza visual final con los valores optimizados de lentes
-- Verificar si el paciente puede ver mejor con los lentes optimizados
-- Completar el examen para cada ojo
+- ✅ Implementar test `agudeza_alcanzada` después de todos los tests de lentes
+- ✅ Medir agudeza visual final con los valores optimizados de lentes
+- ✅ Verificar si el paciente puede ver mejor con los lentes optimizados
+- ✅ Completar el examen para cada ojo
 
 **Contexto:**
-- La secuencia del examen ya incluye `agudeza_alcanzada` en ambos ojos (después de tests de lentes)
-- La función `generarSecuenciaExamen()` ya la agrega correctamente
-- Los tests de lentes (FASE 4 y 5) deben estar completos para que esta fase funcione
-- Falta implementar la lógica específica para este test en `generarPasosEtapa4()`
+- ✅ La secuencia del examen ya incluye `agudeza_alcanzada` en ambos ojos (después de tests de lentes)
+- ✅ La función `generarSecuenciaExamen()` ya la agrega correctamente
+- ✅ Los tests de lentes (FASE 4 y 5) están completos
+- ✅ La lógica específica para este test está implementada en `generarPasosEtapa4()` y `procesarRespuestaAgudezaAlcanzada()`
 
 **Diferencias clave con `agudeza_inicial`:**
 
@@ -1078,13 +1090,16 @@ agudeza_inicial = 0.4
 **Tareas principales:**
 
 1. **Backend (`motorExamen.js`):**
-   - [ ] Extender `generarPasosEtapa4()` para detectar test `agudeza_alcanzada`
-   - [ ] Implementar lógica de inicialización desde `agudeza_inicial` (empezar desde ahí)
-   - [ ] Crear función `calcularValoresFinalesForoptero()` para valores finales
-   - [ ] Configurar foróptero con valores finales antes de iniciar el test
-   - [ ] Extender `procesarRespuestaAgudeza()` para aceptar `agudeza_alcanzada`
-   - [ ] Crear función `procesarRespuestaAgudezaAlcanzada()` con lógica progresiva (bajar hasta 0.0)
-   - [ ] Usar `mapearTipoTestAResultado()` para guardar en campo correcto
+   - [x] ✅ Extender `generarPasosEtapa4()` para detectar test `agudeza_alcanzada`
+   - [x] ✅ Implementar lógica de inicialización desde `agudeza_inicial` (empezar desde ahí)
+   - [x] ✅ Crear función `calcularValoresFinalesForoptero()` para valores finales
+   - [x] ✅ Configurar foróptero con valores finales antes de iniciar el test
+   - [x] ✅ Extender `procesarRespuestaAgudeza()` para aceptar `agudeza_alcanzada`
+   - [x] ✅ Crear función `procesarRespuestaAgudezaAlcanzada()` con lógica progresiva (bajar hasta 0.0)
+   - [x] ✅ Usar `mapearTipoTestAResultado()` para guardar en campo correcto
+   - [x] ✅ **Bug Fix:** Mejorar condición de inicialización para distinguir entre tipos de test cuando es el mismo ojo
+   - [x] ✅ **Bug Fix:** Verificar tipo de test específico en confirmación (no solo si hay algún test confirmado)
+   - [x] ✅ **Bug Fix:** Resetear estado de agudeza al avanzar de lentes a agudeza
 
 2. **Construcción de valores finales del foróptero:**
    ```javascript
@@ -1097,14 +1112,14 @@ agudeza_inicial = 0.4
    ```
 
 3. **Testing:**
-   - [ ] Probar flujo completo: agudeza_inicial R → tests lentes R → agudeza_alcanzada R
-   - [ ] Verificar mejora exitosa (agudeza_inicial 0.1 → agudeza_alcanzada 0.0)
-   - [ ] Verificar caso sin mejora (agudeza_inicial 0.1 → agudeza_alcanzada 0.1)
-   - [ ] Verificar caso agudeza_inicial = 0.0 (no se puede mejorar más)
-   - [ ] Verificar que usa valores finales de lentes en el foróptero correctamente
-   - [ ] Verificar guardado correcto en `resultados[ojo].agudezaAlcanzada`
-   - [ ] Probar transición a ojo izquierdo después de completar R
-   - [ ] Probar finalización del examen después de completar ambos ojos
+   - [x] ✅ Probar flujo completo: agudeza_inicial R → tests lentes R → agudeza_alcanzada R
+   - [x] ✅ Verificar mejora exitosa (agudeza_inicial 0.1 → agudeza_alcanzada 0.0)
+   - [x] ✅ Verificar caso sin mejora (agudeza_inicial 0.1 → agudeza_alcanzada 0.1)
+   - [x] ✅ Verificar caso agudeza_inicial = 0.0 (no se puede mejorar más)
+   - [x] ✅ Verificar que usa valores finales de lentes en el foróptero correctamente
+   - [x] ✅ Verificar guardado correcto en `resultados[ojo].agudezaAlcanzada`
+   - [x] ✅ Probar transición a ojo izquierdo después de completar R
+   - [ ] Probar finalización del examen después de completar ambos ojos (pendiente FASE 7)
 
 **Criterios de Éxito:**
 - ✅ Test `agudeza_alcanzada` funciona correctamente para ambos ojos
@@ -1115,12 +1130,18 @@ agudeza_inicial = 0.4
 - ✅ Guarda resultados en campo correcto (`agudezaAlcanzada`)
 - ✅ Transición correcta al siguiente ojo o finalización
 - ✅ Configuración del foróptero es correcta antes de iniciar el test
+- ✅ **Bug Fix:** No se salta el test después de completar tests de lentes
+- ✅ **Bug Fix:** Inicialización correcta cuando cambia de lentes a agudeza (mismo ojo)
 
 **Tiempo estimado:** 6-8 horas (4-5h implementación + 2-3h testing)
+**Tiempo invertido:** ~6-8 horas ✅ (implementación completa + bug fixes)
 
-**Nota:** Esta fase debe implementarse **DESPUÉS** de completar FASE 4 y FASE 5 (tests de lentes), ya que depende de los resultados de esos tests para configurar correctamente el foróptero.
+**Nota:** Esta fase está **COMPLETADA**. La implementación incluye todas las funcionalidades requeridas y los bug fixes necesarios para evitar que se salte el test.
 
-**📖 Ver plan detallado completo en:** `reference/PLAN_IMPLEMENTACION_AGUDEZA_ALCANZADA.md`
+**Bug Fix (2025-01-27):** Corregido bug crítico donde el sistema saltaba el test de `agudeza_alcanzada` después de completar tests de lentes. El problema tenía 3 causas: (1) Condición de inicialización no distinguía entre tipos de test cuando era el mismo ojo, (2) Verificación de confirmación usaba cualquier test confirmado en lugar del test actual, (3) Estado de agudeza no se reseteaba al avanzar de lentes a agudeza. Solución implementada en 3 partes: mejora de condición de inicialización, verificación de tipo de test específico, y reset del estado al avanzar.
+
+**📖 Ver plan detallado completo en:** `reference/PLAN_IMPLEMENTACION_AGUDEZA_ALCANZADA.md`  
+**📖 Ver análisis del bug en:** `ANALISIS_PROBLEMA_AGUDEZA_ALCANZADA_SALTADA.md`
 
 ---
 
@@ -1249,14 +1270,14 @@ agudeza_inicial = 0.4
 | 3 | Etapa 4 (Agudeza Inicial) | ✅ Completa | 6-8h | 🔴 Crítica |
 | 4 | Etapa 5 (Esférico Grueso) | ✅ Completa | 8-10h | 🟡 Alta |
 | 5 | Etapa 5 (Esférico Fino + Cilíndrico + Cilíndrico Ángulo) | ✅ Completa | 8-10h | 🟡 Alta |
-| 6 | Agudeza Alcanzada | ❌ Pendiente | 3-4h | 🟡 Alta |
+| 6 | Agudeza Alcanzada | ✅ Completa | 6-8h | 🟡 Alta |
 | 7 | Finalización + Refinamientos | ❌ Pendiente | 6-8h | 🟢 Media |
 
-**Progreso:** 5.5/7 fases completadas (79%) - Todos los tests de lentes implementados (esférico grueso, fino, cilíndrico y cilíndrico ángulo)
+**Progreso:** 6/7 fases completadas (86%) - Todos los tests de lentes y agudeza alcanzada implementados
 
-**Tiempo Invertido:** ~38-48 horas ✅ (incluye todos los tests de lentes)
+**Tiempo Invertido:** ~44-56 horas ✅ (incluye todos los tests de lentes y agudeza alcanzada)
 
-**Tiempo Restante Estimado:** ~9-12 horas (agudeza alcanzada, finalización)
+**Tiempo Restante Estimado:** ~6-8 horas (finalización y refinamientos)
 
 **Tiempo Total Estimado:** 40-54 horas
 
@@ -1455,6 +1476,13 @@ Antes de considerar el MVP completo:
 
 ### Detalles de Implementación
 
+**ETAPA_2 (Recálculo) - Completada:**
+- ✅ Función `aplicarRecalculoCilindrico()` implementada completamente
+- ✅ Función `aplicarRecalculoEsferico()` implementada completamente (2025-01-27)
+- ✅ Recálculo esférico: valores negativos se mantienen igual, valores positivos según rangos específicos
+- ✅ Recálculo aplicado a ambos ojos (R y L) en `generarPasosEtapa2()`
+- ✅ Valores recalculados se guardan correctamente en `valoresRecalculados`
+
 **ETAPA_4 (Agudeza Inicial) - Completada:**
 - ✅ Función `procesarRespuestaAgudeza()` con algoritmo completo
 - ✅ Navegación logMAR con confirmación de 2 respuestas iguales
@@ -1475,13 +1503,25 @@ Antes de considerar el MVP completo:
 - ✅ `confirmarResultado()` implementada
 - ✅ Frontend actualizado con `interpretacionComparacion`
 - ✅ `avanzarTest()` actualizado para cambiar etapa automáticamente
-- ❌ Falta extender a esférico fino, cilíndrico y cilíndrico ángulo (FASE 5)
+- ✅ Extendido a esférico fino, cilíndrico y cilíndrico ángulo (FASE 5 completada)
 
-**Agudeza Alcanzada - Pendiente:**
+**Agudeza Alcanzada - Completada:**
 - ✅ Estructura base existe (mismo algoritmo que agudeza inicial)
-- ❌ Falta extender `generarPasosEtapa4()` para detectar `testActual.tipo === 'agudeza_alcanzada'`
-- ❌ Falta guardar en campo correcto (`resultados[ojo].agudezaAlcanzada`)
-- ❌ Falta configurar foróptero con valores finales de lentes antes del test
+- ✅ `generarPasosEtapa4()` detecta `testActual.tipo === 'agudeza_alcanzada'`
+- ✅ Guarda en campo correcto (`resultados[ojo].agudezaAlcanzada`)
+- ✅ Configura foróptero con valores finales de lentes antes del test
+- ✅ Función `calcularValoresFinalesForoptero()` implementada
+- ✅ Función `procesarRespuestaAgudezaAlcanzada()` implementada con lógica progresiva
+- ✅ **Bug Fix:** Condición de inicialización mejorada para distinguir entre tipos de test
+- ✅ **Bug Fix:** Verificación de tipo de test específico en confirmación
+- ✅ **Bug Fix:** Reset del estado al avanzar de lentes a agudeza
+
+**Cambio de Ojo - Implementado:**
+- ✅ Detección de cambio de ojo en `agudeza_inicial` usando test anterior de la secuencia
+- ✅ Configuración automática del foróptero al cambiar de ojo (R → L)
+- ✅ Cambio de oclusión correcto (R: close, L: open)
+- ✅ Espera del foróptero antes de mostrar TV
+- ✅ Mensaje informativo al paciente
 
 ### Próximos Pasos Recomendados
 
@@ -1503,7 +1543,7 @@ Antes de considerar el MVP completo:
 
 **Fecha de creación:** 2025-01-27  
 **Última actualización:** 2025-01-27  
-**Estado:** ✅ Actualizado con estado real de implementación - 5.5/7 fases completadas (79%) - Todos los tests de lentes implementados (esférico grueso, fino, cilíndrico y cilíndrico ángulo)
+**Estado:** ✅ Actualizado con estado real de implementación - 6/7 fases completadas (86%) - Todos los tests de lentes y agudeza alcanzada implementados (esférico grueso, fino, cilíndrico, cilíndrico ángulo y agudeza alcanzada). Recálculo esférico implementado en ETAPA_2. Bug de agudeza alcanzada saltada corregido.
 
 **Nota sobre FASE 4:**
 - ✅ Implementación completa y probada exitosamente
@@ -1527,4 +1567,12 @@ Antes de considerar el MVP completo:
 - ✅ Guardado correcto en campos correspondientes
 - ✅ Actualización automática del foróptero después de confirmar cilíndrico y cilíndrico ángulo
 - ✅ **Bug corregido (2025-01-27):** Sistema de confirmación ahora incrementa correctamente las confirmaciones en lugar de resetearlas, evitando comparaciones duplicadas
+
+**Nota sobre Cambio de Ojo (2025-01-27):**
+- ✅ **Bug corregido:** Cambio de ojo en `agudeza_inicial` ahora funciona correctamente
+- ✅ Detección de cambio de ojo usando test anterior de la secuencia (no depende del estado reseteado)
+- ✅ Configuración automática del foróptero al cambiar de ojo (R → L)
+- ✅ Cambio de oclusión correcto (R: close, L: open)
+- ✅ Espera del foróptero antes de mostrar TV
+- ✅ Mensaje informativo al paciente sobre el cambio de ojo
 

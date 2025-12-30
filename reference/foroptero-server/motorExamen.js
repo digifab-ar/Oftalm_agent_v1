@@ -108,6 +108,27 @@ let estadoExamen = {
     confirmaciones: 0
   },
   
+  // Estado de binocular (para test binocular)
+  binocularEstado: {
+    esferaR: null,           // Valor esférico R inicial
+    esferaL: null,           // Valor esférico L inicial
+    esferaRActual: null,     // Valor esférico R que se está probando
+    esferaLActual: null,     // Valor esférico L que se está probando
+    esferaRAnterior: null,   // Valor esférico R anterior
+    esferaLAnterior: null,   // Valor esférico L anterior
+    esferaRConfirmada: null, // Valor esférico R confirmado
+    esferaLConfirmada: null, // Valor esférico L confirmado
+    confirmaciones: 0,       // Número de confirmaciones (0, 1, 2)
+    faseBinocular: null,     // 'iniciando' | 'mostrando_alternativo' | 'preguntando' | 'confirmando' | 'confirmado'
+    letraActual: null,       // Letra actual en TV
+    logmarActual: null,      // LogMAR actual en TV
+    opcionActual: null,      // 'subir_R' | 'subir_L' | 'bajar_R' | 'bajar_L' | 'base'
+    valoresProbados: {
+      subirR: false,         // ¿Ya probamos subir R?
+      bajarL: false          // ¿Ya probamos bajar L?
+    }
+  },
+  
   // Respuesta pendiente del paciente (para procesamiento)
   respuestaPendiente: null,
   
@@ -117,22 +138,24 @@ let estadoExamen = {
     indiceActual: 0,
     testActual: null, // { tipo: 'agudeza_inicial', ojo: 'R' }
     resultados: {
-      R: {
-        agudezaInicial: null,
-        esfericoGrueso: null,
-        esfericoFino: null,
-        cilindrico: null,
-        cilindricoAngulo: null,
-        agudezaAlcanzada: null
-      },
-      L: {
-        agudezaInicial: null,
-        esfericoGrueso: null,
-        esfericoFino: null,
-        cilindrico: null,
-        cilindricoAngulo: null,
-        agudezaAlcanzada: null
-      }
+        R: {
+          agudezaInicial: null,
+          esfericoGrueso: null,
+          esfericoFino: null,
+          cilindrico: null,
+          cilindricoAngulo: null,
+          agudezaAlcanzada: null,
+          binocular: null
+        },
+        L: {
+          agudezaInicial: null,
+          esfericoGrueso: null,
+          esfericoFino: null,
+          cilindrico: null,
+          cilindricoAngulo: null,
+          agudezaAlcanzada: null,
+          binocular: null
+        }
     }
   },
   
@@ -205,6 +228,25 @@ export function inicializarExamen() {
       intentos: 0,
       confirmaciones: 0
     },
+    binocularEstado: {
+      esferaR: null,
+      esferaL: null,
+      esferaRActual: null,
+      esferaLActual: null,
+      esferaRAnterior: null,
+      esferaLAnterior: null,
+      esferaRConfirmada: null,
+      esferaLConfirmada: null,
+      confirmaciones: 0,
+      faseBinocular: null,
+      letraActual: null,
+      logmarActual: null,
+      opcionActual: null,
+      valoresProbados: {
+        subirR: false,
+        bajarL: false
+      }
+    },
     respuestaPendiente: null,
     secuenciaExamen: {
       testsActivos: [],
@@ -217,7 +259,8 @@ export function inicializarExamen() {
           esfericoFino: null,
           cilindrico: null,
           cilindricoAngulo: null,
-          agudezaAlcanzada: null
+          agudezaAlcanzada: null,
+          binocular: null
         },
         L: {
           agudezaInicial: null,
@@ -225,7 +268,8 @@ export function inicializarExamen() {
           esfericoFino: null,
           cilindrico: null,
           cilindricoAngulo: null,
-          agudezaAlcanzada: null
+          agudezaAlcanzada: null,
+          binocular: null
         }
       }
     },
@@ -388,6 +432,9 @@ export function generarPasos() {
     case 'ETAPA_5':
       return generarPasosEtapa5();
     
+    case 'ETAPA_6':
+      return generarPasosEtapa6();
+    
     default:
       return {
         ok: false,
@@ -509,6 +556,50 @@ export function aplicarRecalculoCilindrico(cilindro) {
 }
 
 /**
+ * Aplica las reglas de recálculo esférico según protocolo clínico
+ * @param {number} esfera - Valor esférico original
+ * @returns {number} - Valor esférico recalculado
+ */
+export function aplicarRecalculoEsferico(esfera) {
+  // Reglas de recálculo esférico (valores en saltos de 0.25, sin gaps):
+  // Valores negativos: mantener igual (no se aplican reglas)
+  // Valores positivos:
+  // 1. Hasta +1.25 inclusive → mantener igual
+  // 2. Entre +1.50 a +3.00 inclusive → restar 0.50
+  // 3. Entre +3.25 a +4.50 inclusive → restar 0.75
+  // 4. Desde +4.75 en adelante → restar 1.00
+  
+  // Valores negativos: mantener igual (no se aplican reglas de recálculo)
+  if (esfera < 0) {
+    return esfera;
+  }
+  
+  // Regla 1: Hasta +1.25 inclusive → mantener igual
+  if (esfera <= 1.25) {
+    return esfera;
+  }
+  
+  // Regla 2: Entre +1.50 a +3.00 inclusive → restar 0.50
+  if (esfera >= 1.50 && esfera <= 3.00) {
+    return esfera - 0.50;
+  }
+  
+  // Regla 3: Entre +3.25 a +4.50 inclusive → restar 0.75
+  if (esfera >= 3.25 && esfera <= 4.50) {
+    return esfera - 0.75;
+  }
+  
+  // Regla 4: Desde +4.75 en adelante → restar 1.00
+  if (esfera >= 4.75) {
+    return esfera - 1.00;
+  }
+  
+  // Por seguridad, retornar valor original si no aplica ninguna regla
+  // (esto no debería pasar con valores en saltos de 0.25)
+  return esfera;
+}
+
+/**
  * Determina qué tests de cilindro incluir según el valor del cilindro recalculado
  * @param {number} cilindro - Valor cilíndrico recalculado
  * @returns {object} - Configuración de tests activos
@@ -585,8 +676,8 @@ function generarSecuenciaExamen() {
   
   secuencia.push({ tipo: 'agudeza_alcanzada', ojo: 'L' });
   
-  // Binocular (opcional, se implementará después)
-  // secuencia.push({ tipo: 'binocular', ojo: 'B' });
+  // Binocular (último test antes de finalizar)
+  secuencia.push({ tipo: 'binocular', ojo: 'B' });
   
   return secuencia;
 }
@@ -611,7 +702,8 @@ function mapearTipoTestAEtapa(tipo) {
     'esferico_fino': 'ETAPA_5',
     'cilindrico': 'ETAPA_5',
     'cilindrico_angulo': 'ETAPA_5',
-    'agudeza_alcanzada': 'ETAPA_4'
+    'agudeza_alcanzada': 'ETAPA_4',
+    'binocular': 'ETAPA_6'
   };
   return mapa[tipo] || 'ETAPA_4'; // Default a ETAPA_4 por seguridad
 }
@@ -623,22 +715,36 @@ function mapearTipoTestAEtapa(tipo) {
 export function avanzarTest() {
   const secuencia = estadoExamen.secuenciaExamen;
   
+  console.log('➡️ [AVANZAR_TEST] Estado ANTES de avanzar:', {
+    indiceActual: secuencia.indiceActual,
+    totalTests: secuencia.testsActivos.length,
+    testActual: secuencia.testActual,
+    etapa: estadoExamen.etapa
+  });
+  
   if (secuencia.indiceActual >= secuencia.testsActivos.length - 1) {
     // Se completó el examen
     estadoExamen.etapa = 'FINALIZADO';
     estadoExamen.finalizado = Date.now();
     secuencia.testActual = null;
+    console.log('➡️ [AVANZAR_TEST] Examen completado');
     return null;
   }
   
   // Avanzar al siguiente test
+  const testAnterior = secuencia.testActual;
   secuencia.indiceActual += 1;
   secuencia.testActual = secuencia.testsActivos[secuencia.indiceActual];
   
   // Actualizar etapa según el tipo de test siguiente
   if (secuencia.testActual) {
     estadoExamen.etapa = mapearTipoTestAEtapa(secuencia.testActual.tipo);
-    console.log(`➡️ Avanzando a test: ${secuencia.testActual.tipo} (${secuencia.testActual.ojo}) → Etapa: ${estadoExamen.etapa}`);
+    console.log(`➡️ [AVANZAR_TEST] Avanzando a test: ${secuencia.testActual.tipo} (${secuencia.testActual.ojo}) → Etapa: ${estadoExamen.etapa}`);
+    console.log('➡️ [AVANZAR_TEST] Cambio de ojo:', {
+      testAnterior: testAnterior ? `${testAnterior.tipo} (${testAnterior.ojo})` : 'null',
+      testActual: `${secuencia.testActual.tipo} (${secuencia.testActual.ojo})`,
+      cambioOjo: testAnterior && testAnterior.ojo !== secuencia.testActual.ojo
+    });
   }
   
   return secuencia.testActual;
@@ -914,9 +1020,25 @@ function procesarRespuestaAgudezaAlcanzada(respuestaPaciente, interpretacionAgud
           
           console.log(`✅ Agudeza alcanzada confirmada para ${ojo}: logMAR ${logmarFinal} (mejoró desde ${agudezaInicial})`);
           
+          console.log('🔍 [AGUDEZA_ALCANZADA] ANTES de resetear y avanzar:', {
+            ojoActual: ojo,
+            estadoOjo: estado.ojo,
+            testActual: estadoExamen.secuenciaExamen.testActual,
+            indiceActual: estadoExamen.secuenciaExamen.indiceActual
+          });
+          
           resetearEstadoAgudeza(estado);
           
           const siguienteTest = avanzarTest();
+          
+          console.log('🔍 [AGUDEZA_ALCANZADA] DESPUÉS de resetear y avanzar:', {
+            ojoAnterior: ojo,
+            estadoOjoDespuesReset: estado.ojo,
+            siguienteTest: siguienteTest,
+            testActual: estadoExamen.secuenciaExamen.testActual,
+            indiceActual: estadoExamen.secuenciaExamen.indiceActual,
+            etapa: estadoExamen.etapa
+          });
           
           return {
             ok: true,
@@ -988,7 +1110,12 @@ function procesarRespuestaAgudezaAlcanzada(respuestaPaciente, interpretacionAgud
       // Primera confirmación en este logMAR
       estado.confirmaciones = 1;
       
-      // Generar nueva letra para segunda confirmación
+      // Bajar logMAR inmediatamente (igual que agudeza_inicial)
+      if (estado.logmarActual > 0.0) {
+        estado.logmarActual = bajarLogMAR(estado.logmarActual);
+      }
+      
+      // Generar nueva letra
       const nuevaLetra = generarLetraSloan(estado.letrasUsadas);
       estado.letraActual = nuevaLetra;
       estado.letrasUsadas.push(nuevaLetra);
@@ -1039,6 +1166,13 @@ function procesarRespuestaAgudezaAlcanzada(respuestaPaciente, interpretacionAgud
  * @param {object} estado - Estado de agudeza a resetear
  */
 function resetearEstadoAgudeza(estado) {
+  console.log('🔄 [RESET AGUDEZA] Estado ANTES de resetear:', {
+    ojo: estado.ojo,
+    logmarActual: estado.logmarActual,
+    letraActual: estado.letraActual,
+    esAgudezaAlcanzada: estado.esAgudezaAlcanzada
+  });
+  
   estado.ojo = null;
   estado.logmarActual = null;
   estado.letraActual = null;
@@ -1049,6 +1183,13 @@ function resetearEstadoAgudeza(estado) {
   estado.confirmaciones = 0;
   estado.esAgudezaAlcanzada = false;
   estado.agudezaInicialReferencia = null;
+  
+  console.log('🔄 [RESET AGUDEZA] Estado DESPUÉS de resetear:', {
+    ojo: estado.ojo,
+    logmarActual: estado.logmarActual,
+    letraActual: estado.letraActual,
+    esAgudezaAlcanzada: estado.esAgudezaAlcanzada
+  });
 }
 
 /**
@@ -1056,10 +1197,15 @@ function resetearEstadoAgudeza(estado) {
  * Esta etapa no genera pasos visibles, solo procesa internamente
  */
 function generarPasosEtapa2() {
-  // Aplicar recálculo cilíndrico a ambos ojos
+  // Aplicar recálculo esférico y cilíndrico a ambos ojos
   const valoresR = { ...estadoExamen.valoresIniciales.R };
   const valoresL = { ...estadoExamen.valoresIniciales.L };
   
+  // Aplicar recálculo esférico
+  valoresR.esfera = aplicarRecalculoEsferico(valoresR.esfera);
+  valoresL.esfera = aplicarRecalculoEsferico(valoresL.esfera);
+  
+  // Aplicar recálculo cilíndrico
   valoresR.cilindro = aplicarRecalculoCilindrico(valoresR.cilindro);
   valoresL.cilindro = aplicarRecalculoCilindrico(valoresL.cilindro);
   
@@ -1090,6 +1236,12 @@ function generarPasosEtapa2() {
 function generarPasosEtapa4() {
   const testActual = estadoExamen.secuenciaExamen.testActual;
   
+  console.log('🔧 [GENERAR_PASOS_ETAPA4] INICIO:', {
+    testActual: testActual ? `${testActual.tipo} (${testActual.ojo})` : 'null',
+    etapa: estadoExamen.etapa,
+    indiceActual: estadoExamen.secuenciaExamen.indiceActual
+  });
+  
   // Validar que estamos en test de agudeza
   if (!testActual || (testActual.tipo !== 'agudeza_inicial' && testActual.tipo !== 'agudeza_alcanzada')) {
     return {
@@ -1102,8 +1254,64 @@ function generarPasosEtapa4() {
   const estado = estadoExamen.agudezaEstado;
   const esAgudezaAlcanzada = testActual.tipo === 'agudeza_alcanzada';
   
-  // Inicializar estado de agudeza si es la primera vez
-  if (estado.ojo !== ojo || estado.logmarActual === null) {
+  console.log('🔧 [GENERAR_PASOS_ETAPA4] Estado de agudeza:', {
+    ojoTest: ojo,
+    estadoOjo: estado.ojo,
+    logmarActual: estado.logmarActual,
+    letraActual: estado.letraActual,
+    esAgudezaAlcanzada: esAgudezaAlcanzada,
+    estadoEsAgudezaAlcanzada: estado.esAgudezaAlcanzada
+  });
+  
+  // Inicializar estado de agudeza si es la primera vez O si cambió el tipo de test
+  // Esto distingue entre agudeza_inicial y agudeza_alcanzada cuando es el mismo ojo
+  const necesitaInicializacion = 
+    estado.ojo !== ojo || 
+    estado.logmarActual === null ||
+    (esAgudezaAlcanzada && !estado.esAgudezaAlcanzada) ||  // Cambió de inicial a alcanzada
+    (!esAgudezaAlcanzada && estado.esAgudezaAlcanzada);   // Cambió de alcanzada a inicial
+  
+  // Detectar cambio de ojo específicamente (para agudeza_inicial)
+  // Usar el test anterior de la secuencia en lugar del estado reseteado
+  const indiceAnterior = estadoExamen.secuenciaExamen.indiceActual - 1;
+  const testAnterior = indiceAnterior >= 0 
+    ? estadoExamen.secuenciaExamen.testsActivos[indiceAnterior]
+    : null;
+  
+  // Detectar cambio de ojo comparando con test anterior
+  const cambioDeOjo = testAnterior !== null && 
+                      testAnterior.ojo !== ojo && 
+                      !esAgudezaAlcanzada;
+  
+  // Detectar cambio de tipo de test (lentes → agudeza) sin cambio de ojo
+  // Esto ocurre cuando se pasa de esférico/cilíndrico a agudeza en el mismo ojo
+  const cambioDeTipoTest = testAnterior !== null && 
+                           testAnterior.tipo !== testActual.tipo &&
+                           (testAnterior.tipo === 'esferico_grueso' || 
+                            testAnterior.tipo === 'esferico_fino' || 
+                            testAnterior.tipo === 'cilindrico' || 
+                            testAnterior.tipo === 'cilindrico_angulo') &&
+                           (testActual.tipo === 'agudeza_inicial' || 
+                            testActual.tipo === 'agudeza_alcanzada') &&
+                           testAnterior.ojo === ojo; // Mismo ojo
+  
+  console.log('🔧 [GENERAR_PASOS_ETAPA4] Evaluación de condiciones:', {
+    necesitaInicializacion,
+    cambioDeOjo,
+    cambioDeTipoTest,
+    evaluacionCambioDeOjo: {
+      'testAnterior !== null': testAnterior !== null,
+      'testAnterior': testAnterior ? `${testAnterior.tipo} (${testAnterior.ojo})` : null,
+      'testAnterior.ojo !== ojo': testAnterior ? testAnterior.ojo !== ojo : false,
+      '!esAgudezaAlcanzada': !esAgudezaAlcanzada,
+      resultado: cambioDeOjo
+    },
+    // Mantener información del estado para debugging
+    estadoOjo: estado.ojo,
+    ojoTest: ojo
+  });
+  
+  if (necesitaInicializacion) {
     estado.ojo = ojo;
     
     if (esAgudezaAlcanzada) {
@@ -1145,10 +1353,10 @@ function generarPasosEtapa4() {
               esfera: valoresFinales.esfera,
               cilindro: valoresFinales.cilindro,
               angulo: valoresFinales.angulo,
-              occlusion: ojo === 'R' ? 'open' : 'close'
+              occlusion: 'open'
             },
             [ojo === 'R' ? 'L' : 'R']: {
-              occlusion: ojo === 'R' ? 'close' : 'open'
+              occlusion: 'close'
             }
           }
         },
@@ -1184,7 +1392,7 @@ function generarPasosEtapa4() {
       };
       
     } else {
-      // Lógica original para agudeza_inicial
+      // Lógica para agudeza_inicial
       estado.logmarActual = 0.4; // Inicio con logMAR 0.4
       estado.letraActual = 'H'; // Primera letra siempre 'H'
       estado.mejorLogmar = null;
@@ -1195,11 +1403,250 @@ function generarPasosEtapa4() {
       estado.esAgudezaAlcanzada = false;
       
       console.log(`🔍 Iniciando test de agudeza visual inicial para ${ojo}`);
+      console.log('🔧 [GENERAR_PASOS_ETAPA4] Evaluando cambio de ojo para agudeza_inicial:', {
+        cambioDeOjo,
+        estadoOjo: estado.ojo,
+        ojoTest: ojo,
+        valoresRecalculados: estadoExamen.valoresRecalculados[ojo]
+      });
+      
+      // Si hay cambio de ojo, configurar foróptero con valores recalculados
+      if (cambioDeOjo) {
+        console.log('✅ [GENERAR_PASOS_ETAPA4] CAMBIO DE OJO DETECTADO - Configurando foróptero');
+        const valoresRecalculados = estadoExamen.valoresRecalculados[ojo];
+        
+        console.log('🔧 [GENERAR_PASOS_ETAPA4] Valores recalculados para configurar:', valoresRecalculados);
+        
+        // Validar que los valores existen
+        if (!valoresRecalculados || 
+            valoresRecalculados.esfera === null || valoresRecalculados.esfera === undefined ||
+            valoresRecalculados.cilindro === null || valoresRecalculados.cilindro === undefined ||
+            valoresRecalculados.angulo === null || valoresRecalculados.angulo === undefined) {
+          return {
+            ok: false,
+            error: `No se encontraron valores recalculados para ${ojo}. No se puede iniciar agudeza_inicial.`
+          };
+        }
+        
+        console.log(`🔄 Cambio de ojo detectado: configurando foróptero para ${ojo}`);
+        console.log(`   Valores recalculados:`, valoresRecalculados);
+        
+        // Generar pasos: Foróptero + Esperar + TV + Hablar
+        const pasos = [
+          {
+            tipo: 'foroptero',
+            orden: 1,
+            foroptero: {
+              [ojo]: {
+                esfera: valoresRecalculados.esfera,
+                cilindro: valoresRecalculados.cilindro,
+                angulo: valoresRecalculados.angulo,
+                occlusion: 'open'
+              },
+              [ojo === 'R' ? 'L' : 'R']: {
+                occlusion: 'close'
+              }
+            }
+          },
+          {
+            tipo: 'esperar_foroptero',
+            orden: 2
+          },
+          {
+            tipo: 'tv',
+            orden: 3,
+            letra: estado.letraActual,
+            logmar: estado.logmarActual
+          },
+          {
+            tipo: 'hablar',
+            orden: 4,
+            mensaje: ojo === 'L' 
+              ? 'Ahora vamos con el ojo izquierdo. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.'
+              : 'Vamos a empezar con el ojo derecho. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.'
+          }
+        ];
+        
+        console.log('✅ [GENERAR_PASOS_ETAPA4] Pasos generados para cambio de ojo:', {
+          cantidadPasos: pasos.length,
+          tiposPasos: pasos.map(p => p.tipo),
+          foropteroConfig: pasos.find(p => p.tipo === 'foroptero')?.foroptero
+        });
+        
+        return {
+          ok: true,
+          pasos,
+          contexto: {
+            etapa: 'ETAPA_4',
+            testActual,
+            agudezaEstado: {
+              logmarActual: estado.logmarActual,
+              letraActual: estado.letraActual,
+              mejorLogmar: estado.mejorLogmar,
+              ultimoLogmarCorrecto: estado.ultimoLogmarCorrecto,
+              confirmaciones: estado.confirmaciones
+            }
+          }
+        };
+      } else {
+        console.log('⚠️ [GENERAR_PASOS_ETAPA4] NO se detectó cambio de ojo - Continuando con lógica normal (solo TV + Hablar)');
+        console.log('⚠️ [GENERAR_PASOS_ETAPA4] Razón:', {
+          estadoOjo: estado.ojo,
+          ojoTest: ojo,
+          esAgudezaAlcanzada,
+          evaluacion: {
+            'estado.ojo !== null': estado.ojo !== null,
+            'estado.ojo !== ojo': estado.ojo !== ojo,
+            '!esAgudezaAlcanzada': !esAgudezaAlcanzada
+          }
+        });
+      }
+      // Si no hay cambio de ojo, continuar con lógica normal (solo TV + Hablar)
     }
   }
   
+  // Si cambió el tipo de test (lentes → agudeza) pero no necesita inicialización,
+  // configurar foróptero con valores correctos (sin cambiar oclusión si mismo ojo)
+  if (!necesitaInicializacion && cambioDeTipoTest) {
+    if (esAgudezaAlcanzada) {
+      // Configurar con valores finales
+      const valoresFinales = calcularValoresFinalesForoptero(ojo);
+      
+      console.log(`🔄 Cambio de tipo de test detectado (lentes → agudeza_alcanzada): configurando foróptero para ${ojo}`);
+      console.log(`   Valores finales:`, valoresFinales);
+      
+      const pasos = [
+        {
+          tipo: 'foroptero',
+          orden: 1,
+          foroptero: {
+            [ojo]: {
+              esfera: valoresFinales.esfera,
+              cilindro: valoresFinales.cilindro,
+              angulo: valoresFinales.angulo,
+              occlusion: 'open' // Ojo del test siempre 'open'
+            },
+            [ojo === 'R' ? 'L' : 'R']: {
+              occlusion: 'close' // Ojo opuesto siempre 'close'
+            }
+          }
+        },
+        {
+          tipo: 'esperar_foroptero',
+          orden: 2
+        },
+        {
+          tipo: 'tv',
+          orden: 3,
+          letra: estado.letraActual,
+          logmar: estado.logmarActual
+        },
+        {
+          tipo: 'hablar',
+          orden: 4,
+          mensaje: 'Mirá la pantalla. Decime qué letra ves.'
+        }
+      ];
+      
+      return {
+        ok: true,
+        pasos,
+        contexto: {
+          etapa: 'ETAPA_4',
+          testActual,
+          agudezaEstado: {
+            logmarActual: estado.logmarActual,
+            letraActual: estado.letraActual,
+            mejorLogmar: estado.mejorLogmar,
+            ultimoLogmarCorrecto: estado.ultimoLogmarCorrecto,
+            confirmaciones: estado.confirmaciones
+          }
+        }
+      };
+    } else {
+      // Configurar con valores recalculados para agudeza_inicial
+      const valoresRecalculados = estadoExamen.valoresRecalculados[ojo];
+      
+      if (!valoresRecalculados || 
+          valoresRecalculados.esfera === null || valoresRecalculados.esfera === undefined ||
+          valoresRecalculados.cilindro === null || valoresRecalculados.cilindro === undefined ||
+          valoresRecalculados.angulo === null || valoresRecalculados.angulo === undefined) {
+        return {
+          ok: false,
+          error: `No se encontraron valores recalculados para ${ojo}. No se puede iniciar agudeza_inicial.`
+        };
+      }
+      
+      console.log(`🔄 Cambio de tipo de test detectado (lentes → agudeza_inicial): configurando foróptero para ${ojo}`);
+      console.log(`   Valores recalculados:`, valoresRecalculados);
+      
+      const pasos = [
+        {
+          tipo: 'foroptero',
+          orden: 1,
+          foroptero: {
+            [ojo]: {
+              esfera: valoresRecalculados.esfera,
+              cilindro: valoresRecalculados.cilindro,
+              angulo: valoresRecalculados.angulo,
+              occlusion: 'open' // Ojo del test siempre 'open'
+            },
+            [ojo === 'R' ? 'L' : 'R']: {
+              occlusion: 'close' // Ojo opuesto siempre 'close'
+            }
+          }
+        },
+        {
+          tipo: 'esperar_foroptero',
+          orden: 2
+        },
+        {
+          tipo: 'tv',
+          orden: 3,
+          letra: estado.letraActual,
+          logmar: estado.logmarActual
+        },
+        {
+          tipo: 'hablar',
+          orden: 4,
+          mensaje: 'Mirá la pantalla. Decime qué letra ves.'
+        }
+      ];
+      
+      return {
+        ok: true,
+        pasos,
+        contexto: {
+          etapa: 'ETAPA_4',
+          testActual,
+          agudezaEstado: {
+            logmarActual: estado.logmarActual,
+            letraActual: estado.letraActual,
+            mejorLogmar: estado.mejorLogmar,
+            ultimoLogmarCorrecto: estado.ultimoLogmarCorrecto,
+            confirmaciones: estado.confirmaciones
+          }
+        }
+      };
+    }
+  }
+  
+  console.log('🔧 [GENERAR_PASOS_ETAPA4] Generando pasos normales (sin cambio de ojo):', {
+    estadoOjo: estadoExamen.agudezaEstado.ojo,
+    ojoTest: testActual.ojo,
+    logmarActual: estadoExamen.agudezaEstado.logmarActual,
+    letraActual: estadoExamen.agudezaEstado.letraActual
+  });
+  
   // Si el resultado ya está confirmado, avanzar al siguiente test
-  if (estadoExamen.agudezaVisual[ojo]?.confirmado) {
+  // Verificar que el test confirmado sea del mismo tipo que el test actual
+  // Esto evita que se salte agudeza_alcanzada cuando agudeza_inicial está confirmado
+  const campoResultado = mapearTipoTestAResultado(testActual.tipo);
+  const resultadoConfirmado = campoResultado 
+    ? estadoExamen.secuenciaExamen.resultados[ojo][campoResultado] !== null
+    : false;
+  
+  if (resultadoConfirmado) {
     const siguienteTest = avanzarTest();
     if (siguienteTest) {
       // avanzarTest() ya actualizó la etapa automáticamente
@@ -1532,6 +1979,54 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
       }
     }
     
+    // Si estamos en ETAPA_6 y hay interpretación de comparación, procesarla
+    if (estadoExamen.etapa === 'ETAPA_6' && interpretacionComparacion) {
+      const resultado = procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion);
+      
+      if (!resultado.ok) {
+        return {
+          ok: false,
+          error: resultado.error || 'Error procesando respuesta binocular'
+        };
+      }
+      
+      // Si se confirmó el resultado, generar pasos del siguiente test (FINALIZADO)
+      if (resultado.resultadoConfirmado) {
+        const pasos = generarPasos();
+        
+        await ejecutarPasosAutomaticamente(pasos.pasos || []);
+        
+        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
+        
+        return {
+          ok: true,
+          pasos: pasosParaAgente,
+          contexto: pasos.contexto || {
+            etapa: estadoExamen.etapa,
+            testActual: estadoExamen.secuenciaExamen.testActual
+          }
+        };
+      }
+      
+      // Si necesita mostrar otro lente, generar pasos
+      if (resultado.necesitaMostrarLente) {
+        const pasos = generarPasosEtapa6();
+        
+        await ejecutarPasosAutomaticamente(pasos.pasos || []);
+        
+        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
+        
+        return {
+          ok: true,
+          pasos: pasosParaAgente,
+          contexto: pasos.contexto || {
+            etapa: estadoExamen.etapa,
+            testActual: estadoExamen.secuenciaExamen.testActual
+          }
+        };
+      }
+    }
+    
     // Si estamos en ETAPA_4 y hay interpretación, usar procesarRespuestaAgudeza directamente
     if (estadoExamen.etapa === 'ETAPA_4' && interpretacionAgudeza) {
       const resultado = procesarRespuestaAgudeza(respuestaPaciente, interpretacionAgudeza);
@@ -1730,6 +2225,24 @@ function mapearTipoTestAResultado(tipo) {
  */
 function obtenerEstadoTest(indice, tipo, ojo) {
   const indiceActual = estadoExamen.secuenciaExamen.indiceActual;
+  
+  // Manejo especial para binocular
+  if (tipo === 'binocular') {
+    const resultados = estadoExamen.secuenciaExamen.resultados;
+    const resultadoR = resultados.R?.binocular;
+    const resultadoL = resultados.L?.binocular;
+    
+    if (resultadoR !== null && resultadoR !== undefined && 
+        resultadoL !== null && resultadoL !== undefined) {
+      return 'completado';
+    } else if (indice === indiceActual) {
+      return 'en_curso';
+    } else {
+      return 'pendiente';
+    }
+  }
+  
+  // Lógica normal para otros tests
   const campoResultado = mapearTipoTestAResultado(tipo);
   const resultado = campoResultado ? estadoExamen.secuenciaExamen.resultados[ojo]?.[campoResultado] : null;
   
@@ -1746,6 +2259,16 @@ function obtenerEstadoTest(indice, tipo, ojo) {
  * Obtiene el resultado de un test específico
  */
 function obtenerResultadoTest(tipo, ojo) {
+  // Manejo especial para binocular
+  if (tipo === 'binocular') {
+    const resultados = estadoExamen.secuenciaExamen.resultados;
+    return {
+      resultadoR: resultados.R?.binocular ?? null,
+      resultadoL: resultados.L?.binocular ?? null
+    };
+  }
+  
+  // Lógica normal para otros tests
   const campoResultado = mapearTipoTestAResultado(tipo);
   if (!campoResultado) return null;
   
@@ -2536,10 +3059,406 @@ function confirmarResultado(valorFinal) {
   // Avanzar al siguiente test
   const siguienteTest = avanzarTest();
   
+  // Si el siguiente test es agudeza_alcanzada, resetear estado de agudeza
+  // Esto asegura que el estado esté limpio para agudeza_alcanzada
+  // y evita problemas de inicialización cuando cambia de lentes a agudeza
+  if (siguienteTest && siguienteTest.tipo === 'agudeza_alcanzada') {
+    resetearEstadoAgudeza(estadoExamen.agudezaEstado);
+  }
+  
   return {
     ok: true,
     resultadoConfirmado: true,
     valorFinal,
+    siguienteTest
+  };
+}
+
+/**
+ * Inicializa el estado de binocular
+ * @returns {object} - Resultado de la inicialización
+ */
+function iniciarBinocular() {
+  const resultados = estadoExamen.secuenciaExamen.resultados;
+  
+  // Obtener valores esféricos finales de cada ojo (SOLO esfericoFino)
+  const esferaR = resultados.R.esfericoFino;
+  const esferaL = resultados.L.esfericoFino;
+  
+  // Validar que existen valores de esfericoFino
+  if (esferaR === null || esferaR === undefined) {
+    return { ok: false, error: 'No se encontró resultado de esférico fino para ojo R' };
+  }
+  
+  if (esferaL === null || esferaL === undefined) {
+    return { ok: false, error: 'No se encontró resultado de esférico fino para ojo L' };
+  }
+  
+  // Obtener logMAR máximo para TV
+  const logmarR = resultados.R.agudezaAlcanzada || 0.4;
+  const logmarL = resultados.L.agudezaAlcanzada || 0.4;
+  const logmarMaximo = Math.max(logmarR, logmarL);
+  
+  // Inicializar estado binocular
+  estadoExamen.binocularEstado = {
+    esferaR: esferaR,
+    esferaL: esferaL,
+    esferaRActual: esferaR,
+    esferaLActual: esferaL,
+    esferaRAnterior: null,
+    esferaLAnterior: null,
+    esferaRConfirmada: null,
+    esferaLConfirmada: null,
+    confirmaciones: 0,
+    faseBinocular: 'iniciando',
+    letraActual: 'H',
+    logmarActual: logmarMaximo,
+    opcionActual: null,
+    valoresProbados: {
+      subirR: false,
+      bajarL: false
+    }
+  };
+  
+  console.log(`🔍 Iniciando test binocular:`, {
+    esferaR,
+    esferaL,
+    diferencia: Math.abs(esferaR - esferaL),
+    logmarMaximo
+  });
+  
+  return { ok: true, binocularIniciado: true };
+}
+
+/**
+ * Genera pasos para ETAPA_6 (test binocular)
+ */
+function generarPasosEtapa6() {
+  const testActual = estadoExamen.secuenciaExamen.testActual;
+  
+  // Validar que estamos en test binocular
+  if (!testActual || testActual.tipo !== 'binocular') {
+    return {
+      ok: false,
+      error: 'No estamos en test binocular'
+    };
+  }
+  
+  const estado = estadoExamen.binocularEstado;
+  const resultados = estadoExamen.secuenciaExamen.resultados;
+  
+  // Si no hay estado binocular iniciado, inicializarlo
+  if (!estado || estado.esferaR === null || estado.esferaR === undefined) {
+    const resultado = iniciarBinocular();
+    if (!resultado.ok) {
+      return resultado;
+    }
+  }
+  
+  const estadoActual = estadoExamen.binocularEstado;
+  
+  // Si el resultado ya está confirmado, avanzar al siguiente test (FINALIZADO)
+  if (resultados.R.binocular !== null && resultados.L.binocular !== null) {
+    const siguienteTest = avanzarTest();
+    // avanzarTest() debería retornar null y marcar etapa como FINALIZADO
+    return generarPasos(); // Generar pasos de FINALIZADO
+  }
+  
+  // Generar pasos según la fase
+  const pasos = [];
+  
+  if (estadoActual.faseBinocular === 'iniciando') {
+    // Configurar foróptero con valores iniciales
+    const valoresFinalesR = calcularValoresFinalesForoptero('R');
+    const valoresFinalesL = calcularValoresFinalesForoptero('L');
+    
+    pasos.push({
+      tipo: 'foroptero',
+      orden: 1,
+      foroptero: {
+        R: {
+          esfera: estadoActual.esferaR,
+          cilindro: valoresFinalesR.cilindro,
+          angulo: valoresFinalesR.angulo,
+          occlusion: 'open'
+        },
+        L: {
+          esfera: estadoActual.esferaL,
+          cilindro: valoresFinalesL.cilindro,
+          angulo: valoresFinalesL.angulo,
+          occlusion: 'open'
+        }
+      }
+    });
+    
+    pasos.push({
+      tipo: 'esperar_foroptero',
+      orden: 2
+    });
+    
+    pasos.push({
+      tipo: 'tv',
+      orden: 3,
+      letra: estadoActual.letraActual,
+      logmar: estadoActual.logmarActual
+    });
+    
+    // Calcular diferencia y decidir qué probar primero
+    const diferencia = Math.abs(estadoActual.esferaR - estadoActual.esferaL);
+    
+    if (diferencia > 0.25) {
+      // Hay diferencia significativa, mostrar mensaje de comparación
+      pasos.push({
+        tipo: 'hablar',
+        orden: 4,
+        mensaje: 'Ahora vamos a hacer un último ajuste con ambos ojos abiertos. Vamos a comparar algunos lentes para mejorar el confort.'
+      });
+      // Hay diferencia significativa, probar ajuste
+      // Probar primero: subir el más bajo
+      if (estadoActual.esferaR < estadoActual.esferaL) {
+        // R es menor, preparar para subir R
+        estadoActual.esferaRActual = estadoActual.esferaR + 0.25;
+        estadoActual.esferaLActual = estadoActual.esferaL;
+        estadoActual.esferaRAnterior = estadoActual.esferaR;
+        estadoActual.esferaLAnterior = estadoActual.esferaL;
+        estadoActual.opcionActual = 'subir_R';
+        estadoActual.valoresProbados.subirR = true;
+        estadoActual.faseBinocular = 'mostrando_alternativo';
+      } else {
+        // L es menor, preparar para subir L (o bajar R)
+        estadoActual.esferaRActual = estadoActual.esferaR;
+        estadoActual.esferaLActual = estadoActual.esferaL + 0.25;
+        estadoActual.esferaRAnterior = estadoActual.esferaR;
+        estadoActual.esferaLAnterior = estadoActual.esferaL;
+        estadoActual.opcionActual = 'subir_L';
+        estadoActual.valoresProbados.subirR = true; // Marcar que probamos ajuste
+        estadoActual.faseBinocular = 'mostrando_alternativo';
+      }
+    } else {
+      // Diferencia pequeña (<= 0.25), confirmar valores actuales directamente
+      // Ya tenemos los valores base configurados, solo necesitamos confirmación
+      // No hay alternativa para probar, así que directamente vamos a confirmar
+      estadoActual.esferaRActual = estadoActual.esferaR;
+      estadoActual.esferaLActual = estadoActual.esferaL;
+      estadoActual.esferaRAnterior = estadoActual.esferaR;
+      estadoActual.esferaLAnterior = estadoActual.esferaL;
+      
+      // Mensaje diferente cuando la diferencia es pequeña
+      pasos.push({
+        tipo: 'hablar',
+        orden: 4,
+        mensaje: 'Ahora vamos a hacer un último ajuste con ambos ojos abiertos. ¿Ves bien con esta configuración?'
+      });
+      
+      estadoActual.faseBinocular = 'preguntando';
+      // Los valores actuales ya son los base, así que no necesitamos cambiar nada
+      // La confirmación se hará en procesarRespuestaBinocular cuando responda
+    }
+    
+  } else if (estadoActual.faseBinocular === 'mostrando_alternativo') {
+    // Mostrar alternativa (ya configurado en iniciando)
+    // Solo generar pasos de foróptero y TV
+    const valoresFinalesR = calcularValoresFinalesForoptero('R');
+    const valoresFinalesL = calcularValoresFinalesForoptero('L');
+    
+    pasos.push({
+      tipo: 'foroptero',
+      orden: 1,
+      foroptero: {
+        R: {
+          esfera: estadoActual.esferaRActual,
+          cilindro: valoresFinalesR.cilindro,
+          angulo: valoresFinalesR.angulo,
+          occlusion: 'open'
+        },
+        L: {
+          esfera: estadoActual.esferaLActual,
+          cilindro: valoresFinalesL.cilindro,
+          angulo: valoresFinalesL.angulo,
+          occlusion: 'open'
+        }
+      }
+    });
+    
+    pasos.push({
+      tipo: 'esperar_foroptero',
+      orden: 2
+    });
+    
+    pasos.push({
+      tipo: 'tv',
+      orden: 3,
+      letra: estadoActual.letraActual,
+      logmar: estadoActual.logmarActual
+    });
+    
+    pasos.push({
+      tipo: 'hablar',
+      orden: 4,
+      mensaje: 'Ves mejor con esta configuración o con la anterior?'
+    });
+    
+    estadoActual.faseBinocular = 'preguntando';
+    
+  } else if (estadoActual.faseBinocular === 'preguntando') {
+    // Esperando respuesta, no generar pasos
+    return {
+      ok: true,
+      pasos: [],
+      contexto: {
+        etapa: 'ETAPA_6',
+        testActual,
+        binocularEstado: {
+          faseBinocular: estadoActual.faseBinocular,
+          esferaRActual: estadoActual.esferaRActual,
+          esferaLActual: estadoActual.esferaLActual,
+          confirmaciones: estadoActual.confirmaciones
+        }
+      }
+    };
+  }
+  
+  return {
+    ok: true,
+    pasos,
+    contexto: {
+      etapa: 'ETAPA_6',
+      testActual,
+      binocularEstado: {
+        faseBinocular: estadoActual.faseBinocular,
+        esferaRActual: estadoActual.esferaRActual,
+        esferaLActual: estadoActual.esferaLActual,
+        confirmaciones: estadoActual.confirmaciones
+      }
+    }
+  };
+}
+
+/**
+ * Procesa la respuesta del paciente en test binocular
+ * @param {string} respuestaPaciente - Respuesta del paciente (texto crudo)
+ * @param {object} interpretacionComparacion - Interpretación estructurada del agente
+ * @returns {object} - Resultado del procesamiento
+ */
+function procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion) {
+  const estado = estadoExamen.binocularEstado;
+  const testActual = estadoExamen.secuenciaExamen.testActual;
+  
+  // Validar que estamos en test binocular
+  if (!estado || !testActual || testActual.tipo !== 'binocular') {
+    return { ok: false, error: 'No estamos en test binocular' };
+  }
+  
+  // Interpretar preferencia (usar función existente)
+  const preferencia = interpretarPreferenciaLente(respuestaPaciente, interpretacionComparacion);
+  
+  if (!preferencia) {
+    return { ok: false, error: 'No se pudo interpretar la preferencia del paciente' };
+  }
+  
+  console.log(`📊 Procesando respuesta binocular:`, {
+    respuestaPaciente,
+    preferencia,
+    esferaRActual: estado.esferaRActual,
+    esferaLActual: estado.esferaLActual,
+    esferaRAnterior: estado.esferaRAnterior,
+    esferaLAnterior: estado.esferaLAnterior,
+    confirmaciones: estado.confirmaciones
+  });
+  
+  // Procesar según preferencia
+  if (preferencia === 'actual') {
+    // Eligió la configuración actual (alternativa)
+    estado.confirmaciones += 1;
+    
+    if (estado.confirmaciones >= 2) {
+      // Confirmado con valores alternativos
+      return confirmarResultadoBinocular(estado.esferaRActual, estado.esferaLActual);
+    }
+    
+    // Aún necesita otra confirmación
+    // Mostrar nuevamente la configuración actual
+    estado.faseBinocular = 'mostrando_alternativo';
+    return { ok: true, necesitaMostrarLente: true };
+    
+  } else if (preferencia === 'anterior') {
+    // Eligió la configuración anterior (base)
+    estado.confirmaciones += 1;
+    
+    if (estado.confirmaciones >= 2) {
+      // Confirmado con valores base
+      return confirmarResultadoBinocular(estado.esferaR, estado.esferaL);
+    }
+    
+    // Aún necesita otra confirmación
+    // Volver a valores base y mostrar nuevamente
+    estado.esferaRActual = estado.esferaR;
+    estado.esferaLActual = estado.esferaL;
+    estado.faseBinocular = 'mostrando_alternativo';
+    return { ok: true, necesitaMostrarLente: true };
+    
+  } else if (preferencia === 'igual') {
+    // Dice que son iguales
+    if (estado.confirmaciones === 0) {
+      // Primera vez que dice igual, reintentar
+      estado.faseBinocular = 'mostrando_alternativo';
+      return { ok: true, necesitaMostrarLente: true };
+    } else {
+      // Ya dijo igual antes, usar valores base (originales)
+      return confirmarResultadoBinocular(estado.esferaR, estado.esferaL);
+    }
+  }
+  
+  return { ok: true };
+}
+
+/**
+ * Confirma el resultado final del test binocular
+ * @param {number} esferaRFinal - Valor esférico R final confirmado
+ * @param {number} esferaLFinal - Valor esférico L final confirmado
+ * @returns {object} - Resultado de la confirmación
+ */
+function confirmarResultadoBinocular(esferaRFinal, esferaLFinal) {
+  const resultados = estadoExamen.secuenciaExamen.resultados;
+  
+  // Guardar resultados
+  resultados.R.binocular = esferaRFinal;
+  resultados.L.binocular = esferaLFinal;
+  
+  console.log(`✅ Resultado binocular confirmado:`, {
+    esferaR: esferaRFinal,
+    esferaL: esferaLFinal
+  });
+  
+  // Resetear estado binocular
+  estadoExamen.binocularEstado = {
+    esferaR: null,
+    esferaL: null,
+    esferaRActual: null,
+    esferaLActual: null,
+    esferaRAnterior: null,
+    esferaLAnterior: null,
+    esferaRConfirmada: null,
+    esferaLConfirmada: null,
+    confirmaciones: 0,
+    faseBinocular: null,
+    letraActual: null,
+    logmarActual: null,
+    opcionActual: null,
+    valoresProbados: {
+      subirR: false,
+      bajarL: false
+    }
+  };
+  
+  // Avanzar al siguiente test (debería ser FINALIZADO)
+  const siguienteTest = avanzarTest();
+  
+  return {
+    ok: true,
+    resultadoConfirmado: true,
+    esferaRFinal,
+    esferaLFinal,
     siguienteTest
   };
 }
@@ -2557,6 +3476,19 @@ export function obtenerDetalleExamen() {
     const estado = obtenerEstadoTest(indice, test.tipo, test.ojo);
     const resultado = obtenerResultadoTest(test.tipo, test.ojo);
     
+    // Manejo especial para binocular
+    if (test.tipo === 'binocular') {
+      return {
+        indice,
+        tipo: test.tipo,
+        ojo: test.ojo,
+        estado,
+        resultadoR: resultado?.resultadoR ?? null,
+        resultadoL: resultado?.resultadoL ?? null
+      };
+    }
+    
+    // Lógica normal para otros tests
     return {
       indice,
       tipo: test.tipo,
