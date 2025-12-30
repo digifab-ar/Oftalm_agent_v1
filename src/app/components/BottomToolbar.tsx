@@ -79,7 +79,7 @@ function BottomToolbar({
         />
         <label
           htmlFor="push-to-talk"
-          className="flex items-center cursor-pointer"
+          className="flex items-center cursor-pointer hidden"
         >
           Pulsa para hablar
         </label>
