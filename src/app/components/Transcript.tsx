@@ -75,7 +75,7 @@ function Transcript({
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between px-6 py-3 sticky top-0 z-10 text-base border-b bg-white rounded-t-xl">
           <span className="font-semibold">Conversación</span>
-          <div className="flex gap-x-2">
+          <div className="flex gap-x-2 hidden">
             <button
               onClick={handleCopyTranscript}
               className="w-24 text-sm px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 flex items-center justify-center gap-x-1"

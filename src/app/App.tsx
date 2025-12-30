@@ -452,7 +452,7 @@ function App() {
             Oftalmólogo <span className="text-gray-500">AI</span>
           </div>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center hidden">
           <label className="flex items-center text-base gap-1 mr-2 font-medium">
             Scenario
           </label>
