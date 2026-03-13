@@ -27,6 +27,8 @@ export function inicializarEjecutores(foropteroFn, tvFn, estadoForopteroFn) {
 
 // Estado global del examen (en memoria para MVP)
 let estadoExamen = {
+  // Modo de examen: 'normal' (por defecto) o tests de prueba ('testag', 'testesf', 'testcil', 'testbin')
+  modo: 'normal',
   // Identificación
   sessionId: null,
   
@@ -169,6 +171,7 @@ let estadoExamen = {
  */
 export function inicializarExamen() {
   estadoExamen = {
+    modo: 'normal',
     sessionId: null,
     etapa: 'INICIO',
     subEtapa: null,
@@ -384,7 +387,41 @@ function procesarRespuestaEtapa1(respuestaPaciente) {
   const validacion = validarValoresIniciales(respuestaPaciente);
   
   if (!validacion.valido) {
-    // Generar pasos de error
+    // Si no son valores válidos, comprobar comandos de test de prueba
+    const comando = respuestaPaciente?.trim();
+    if (comando === 'testag' || comando === 'testesf' || comando === 'testcil' || comando === 'testbin') {
+      estadoExamen.modo = comando;
+      console.log(`✅ Modo de examen de prueba activado: ${comando}`);
+
+      let mensajeModo = '';
+      switch (comando) {
+        case 'testag':
+          mensajeModo = 'Vamos a hacer un test de prueba de agudeza visual en ambos ojos.';
+          break;
+        case 'testesf':
+          mensajeModo = 'Vamos a hacer un test de prueba de lentes esféricos (grueso y fino) en ambos ojos.';
+          break;
+        case 'testcil':
+          mensajeModo = 'Vamos a hacer un test de prueba de lentes cilíndricos en ambos ojos.';
+          break;
+        case 'testbin':
+          mensajeModo = 'Vamos a hacer un test de prueba binocular.';
+          break;
+      }
+
+      return {
+        ok: true,
+        pasos: [
+          {
+            tipo: 'hablar',
+            orden: 1,
+            mensaje: `${mensajeModo} Ahora escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0`
+          }
+        ]
+      };
+    }
+
+    // Generar pasos de error de formato
     return {
       ok: true,
       pasos: [
@@ -706,6 +743,64 @@ function mapearTipoTestAEtapa(tipo) {
     'binocular': 'ETAPA_6'
   };
   return mapa[tipo] || 'ETAPA_4'; // Default a ETAPA_4 por seguridad
+}
+
+/**
+ * Genera la secuencia de tests para modo de examen de prueba
+ * @param {string} modo - 'testag' | 'testesf' | 'testcil' | 'testbin'
+ * @returns {array} - Array de tests activos en orden de ejecución
+ */
+function generarSecuenciaPrueba(modo) {
+  const secuencia = [];
+  const valoresR = estadoExamen.valoresRecalculados.R;
+  const valoresL = estadoExamen.valoresRecalculados.L;
+
+  if (modo === 'testag') {
+    // Solo agudeza inicial en ambos ojos
+    secuencia.push({ tipo: 'agudeza_inicial', ojo: 'R' });
+    secuencia.push({ tipo: 'agudeza_inicial', ojo: 'L' });
+    return secuencia;
+  }
+
+  if (modo === 'testesf') {
+    // Esférico grueso y fino en ambos ojos
+    secuencia.push({ tipo: 'esferico_grueso', ojo: 'R' });
+    secuencia.push({ tipo: 'esferico_fino', ojo: 'R' });
+    secuencia.push({ tipo: 'esferico_grueso', ojo: 'L' });
+    secuencia.push({ tipo: 'esferico_fino', ojo: 'L' });
+    return secuencia;
+  }
+
+  if (modo === 'testcil') {
+    // Tests cilíndricos según lógica actual (determinarTestsActivos), por ojo
+    const testsActivosR = determinarTestsActivos(valoresR.cilindro);
+    const testsActivosL = determinarTestsActivos(valoresL.cilindro);
+
+    if (testsActivosR.cilindrico) {
+      secuencia.push({ tipo: 'cilindrico', ojo: 'R' });
+    }
+    if (testsActivosR.cilindricoAngulo) {
+      secuencia.push({ tipo: 'cilindrico_angulo', ojo: 'R' });
+    }
+
+    if (testsActivosL.cilindrico) {
+      secuencia.push({ tipo: 'cilindrico', ojo: 'L' });
+    }
+    if (testsActivosL.cilindricoAngulo) {
+      secuencia.push({ tipo: 'cilindrico_angulo', ojo: 'L' });
+    }
+
+    return secuencia;
+  }
+
+  if (modo === 'testbin') {
+    // Solo test binocular
+    secuencia.push({ tipo: 'binocular', ojo: 'B' });
+    return secuencia;
+  }
+
+  // Fallback de seguridad: usar secuencia normal
+  return generarSecuenciaExamen();
 }
 
 /**
@@ -1722,8 +1817,10 @@ function generarPasosEtapa3() {
     };
   }
   
-  // 1. Generar secuencia completa del examen
-  const secuencia = generarSecuenciaExamen();
+  // 1. Generar secuencia del examen según modo
+  const secuencia = estadoExamen.modo === 'normal'
+    ? generarSecuenciaExamen()
+    : generarSecuenciaPrueba(estadoExamen.modo);
   
   // 2. Guardar secuencia en el estado
   estadoExamen.secuenciaExamen.testsActivos = secuencia;
@@ -3501,6 +3598,8 @@ export function obtenerDetalleExamen() {
   return {
     ok: true,
     detalle: {
+      // 0. Modo de examen
+      modo: estadoExamen.modo,
       // 1. Valores iniciales
       valoresIniciales: {
         R: { ...valoresIniciales.R },
