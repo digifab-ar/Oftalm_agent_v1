@@ -12,10 +12,14 @@ import { RealtimeAgent } from '@openai/agents/realtime';
 // import supervisorAgent from './supervisorAgent';
 
 // ============================================
-// OPCIÓN 2: Versión Optimizada con Instrucciones Modulares (RECOMENDADA)
+// OPCIÓN 2: Versión Optimizada con Instrucciones Modulares (REQUIERE ARCHIVOS EXTRA)
 // ============================================
-import supervisorAgentOptimized from './supervisorAgentOptimized';
-const supervisorAgent = supervisorAgentOptimized; // Alias para compatibilidad
+// Nota: Esta opción queda solo como referencia.
+// Los archivos `supervisorAgentOptimized` y relacionados se han eliminado del proyecto actual,
+// por lo que estas líneas se dejan comentadas para evitar errores en el build.
+// Si en el futuro recreas esa implementación, podés descomentar estas líneas y crear el archivo correspondiente.
+// import supervisorAgentOptimized from './supervisorAgentOptimized';
+// const supervisorAgent = supervisorAgentOptimized; // Alias para compatibilidad
 
 // ============================================
 // OPCIÓN 3: Versión con Actualización Dinámica
@@ -55,10 +59,13 @@ Podés:
 Habla siempre en tono humano, sin tecnicismos de programación ni estructuras de código.
   `,
   voice: 'alloy',
-  handoffs: [supervisorAgent]
+  // En el proyecto actual no se usa un supervisor separado,
+  // por lo que este ejemplo no referencia ningún `supervisorAgent` real.
+  // Si en el futuro agregás uno, podés pasarlo aquí en `handoffs`.
+  handoffs: []
 });
 
-export const chatSupervisorScenario = [supervisorAgent, chatAgent];
+export const chatSupervisorScenario = [chatAgent];
 
 // Name of the company represented by this agent set. Used by guardrails
 export const chatSupervisorCompanyName = 'Viejo';
