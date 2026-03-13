@@ -29,10 +29,9 @@ Siempre hablá de manera natural y clínica: "Mirá la pantalla", "Decime qué l
 4. Habla al paciente usando el mensaje exacto que el backend te da
 5. Después de hablar, espera la respuesta del paciente
 6. Cuando el paciente responda:
-   - **Si estás pidiendo valores iniciales (ETAPA_1):** Envía **exactamente** lo que el paciente dijo o escribió en \`respuestaPaciente\`. No resumas, no cambies palabras ni formato. Si escribió "testag" → envía "testag". Si escribió los valores del autorefractómetro → envía esa línea completa tal cual. Llama \`obtenerEtapa({ respuestaPaciente: "texto literal del paciente" })\`.
    - **Si estás en test de agudeza visual (ETAPA_4):** Interpreta la respuesta y llama \`obtenerEtapa(respuestaPaciente, interpretacionAgudeza)\` con la interpretación estructurada
    - **Si estás en test de comparación de lentes (ETAPA_5) o test binocular (ETAPA_6):** Interpreta la preferencia y llama \`obtenerEtapa(respuestaPaciente, null, interpretacionComparacion)\` con la interpretación estructurada
-   - **Si no estás en agudeza ni comparación:** Llama \`obtenerEtapa(respuestaPaciente)\` con la respuesta **literal** del paciente (sin modificar)
+   - **Si no estás en agudeza ni comparación:** Llama \`obtenerEtapa(respuestaPaciente)\` con su respuesta
 7. El backend procesará la respuesta, ejecutará comandos automáticamente, y te dará nuevos pasos de "hablar"
 8. Repite desde el paso 4
 
@@ -62,16 +61,6 @@ Formato de interpretación:
 Ejemplo de llamada:
 obtenerEtapa con respuestaPaciente: "Con el anterior" e interpretacionComparacion: { preferencia: "anterior" }
 
-# Comandos de test de prueba (ETAPA_1)
-
-Si el paciente escribe o dice exactamente uno de estos comandos, **envíalo tal cual** en \`respuestaPaciente\`:
-- \`testag\` → prueba de agudeza visual
-- \`testesf\` → prueba de lentes esféricos
-- \`testcil\` → prueba de lentes cilíndricos
-- \`testbin\` → prueba binocular
-
-**No los interpretes ni los resumas.** Envía el string exacto (minúsculas, todo junto). Ejemplo: si el paciente escribe "testesf", llama \`obtenerEtapa({ respuestaPaciente: "testesf" })\` — nunca "esf" ni "test esf".
-
 # Reglas Absolutas
 
 - **NUNCA decidas qué hacer** - siempre consulta \`obtenerEtapa()\` primero
@@ -80,7 +69,6 @@ Si el paciente escribe o dice exactamente uno de estos comandos, **envíalo tal 
 - **Usa el mensaje exacto** que el backend te da
 - **No expliques procesos** - solo habla de forma natural
 - **No guardes estado** - el backend maneja todo
-- **Si el paciente acaba de responder:** siempre envía \`respuestaPaciente\` con lo que dijo (texto literal). Solo omite \`respuestaPaciente\` cuando no hubo respuesta (ej: al iniciar)
 
 `;
 
@@ -94,14 +82,14 @@ export const chatAgent = new RealtimeAgent({
     // y solo retorna pasos de tipo "hablar" para que el agente ejecute
     tool({
       name: 'obtenerEtapa',
-      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye en respuestaPaciente la transcripción literal de lo que dijo (sin resumir ni cambiar). En ETAPA_1 envía exactamente lo que escribió: si es "testag"/"testesf"/"testcil"/"testbin" o los valores del autorefractómetro, pásalos tal cual. Si estás en ETAPA_4 incluye también interpretacionAgudeza; si estás en ETAPA_5 o ETAPA_6 incluye interpretacionComparacion.',
+      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en test de comparación de lentes (ETAPA_5) o test binocular (ETAPA_6), también incluye interpretacionComparacion con la interpretación estructurada de la preferencia.',
       parameters: {
         type: 'object',
         properties: {
           respuestaPaciente: {
             type: 'string',
             nullable: true,
-            description: 'Transcripción literal de lo que el paciente dijo o escribió. No modificar: si escribió "testesf" envía "testesf"; si escribió valores del autorefractómetro envía esa línea completa. Solo omitir cuando no hubo respuesta (ej: al iniciar).'
+            description: 'Respuesta del paciente (letra, valores, preferencia de lente). Solo incluir si el paciente acaba de responder.'
           },
           interpretacionAgudeza: {
             type: 'object',
