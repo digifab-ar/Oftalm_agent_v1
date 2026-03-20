@@ -169,9 +169,12 @@ let estadoExamen = {
 /**
  * Inicializa el examen (resetea todo el estado)
  */
-export function inicializarExamen() {
+export function inicializarExamen(modo = 'normal') {
+  const modosPermitidos = ['normal', 'testag', 'testesf', 'testcil', 'testbin'];
+  const modoInicial = modosPermitidos.includes(modo) ? modo : 'normal';
+
   estadoExamen = {
-    modo: 'normal',
+    modo: modoInicial,
     sessionId: null,
     etapa: 'INICIO',
     subEtapa: null,
@@ -280,7 +283,7 @@ export function inicializarExamen() {
     finalizado: null
   };
   
-  console.log('✅ Examen inicializado');
+  console.log(`✅ Examen inicializado (modo: ${modoInicial})`);
   return estadoExamen;
 }
 
@@ -387,40 +390,6 @@ function procesarRespuestaEtapa1(respuestaPaciente) {
   const validacion = validarValoresIniciales(respuestaPaciente);
   
   if (!validacion.valido) {
-    // Si no son valores válidos, comprobar comandos de test de prueba
-    const comando = respuestaPaciente?.trim();
-    if (comando === 'testag' || comando === 'testesf' || comando === 'testcil' || comando === 'testbin') {
-      estadoExamen.modo = comando;
-      console.log(`✅ Modo de examen de prueba activado: ${comando}`);
-
-      let mensajeModo = '';
-      switch (comando) {
-        case 'testag':
-          mensajeModo = 'Vamos a hacer un test de prueba de agudeza visual en ambos ojos.';
-          break;
-        case 'testesf':
-          mensajeModo = 'Vamos a hacer un test de prueba de lentes esféricos (grueso y fino) en ambos ojos.';
-          break;
-        case 'testcil':
-          mensajeModo = 'Vamos a hacer un test de prueba de lentes cilíndricos en ambos ojos.';
-          break;
-        case 'testbin':
-          mensajeModo = 'Vamos a hacer un test de prueba binocular.';
-          break;
-      }
-
-      return {
-        ok: true,
-        pasos: [
-          {
-            tipo: 'hablar',
-            orden: 1,
-            mensaje: `${mensajeModo} Ahora escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0`
-          }
-        ]
-      };
-    }
-
     // Generar pasos de error de formato
     return {
       ok: true,
@@ -1801,8 +1770,11 @@ function generarPasosEtapa3() {
   // Verificar si ya se generaron los pasos de ETAPA_3
   // Si ya se generaron, no volver a generarlos (evitar loop)
   if (estadoExamen.subEtapa === 'FOROPTERO_CONFIGURADO') {
-    // Ya se configuró el foróptero, pasar a ETAPA_4
-    estadoExamen.etapa = 'ETAPA_4';
+    // Ya se configuró el foróptero, pasar a la etapa que corresponda al test actual
+    const etapaSiguiente = estadoExamen.secuenciaExamen.testActual
+      ? mapearTipoTestAEtapa(estadoExamen.secuenciaExamen.testActual.tipo)
+      : 'ETAPA_4';
+    estadoExamen.etapa = etapaSiguiente;
     estadoExamen.ojoActual = estadoExamen.secuenciaExamen.testActual?.ojo || 'R';
     
     // Retornar pasos vacíos para que el agente espere respuesta
@@ -1811,7 +1783,7 @@ function generarPasosEtapa3() {
       ok: true,
       pasos: [],
       contexto: {
-        etapa: 'ETAPA_4',
+        etapa: estadoExamen.etapa,
         testActual: estadoExamen.secuenciaExamen.testActual
       }
     };
@@ -1846,8 +1818,11 @@ function generarPasosEtapa3() {
   // 5. Establecer ojo actual según el primer test
   estadoExamen.ojoActual = estadoExamen.secuenciaExamen.testActual?.ojo || 'R';
   
-  // 6. Pasar a ETAPA_4 (el primer test se ejecutará en Etapa 4)
-  estadoExamen.etapa = 'ETAPA_4';
+  // 6. Pasar a la etapa correspondiente al primer test
+  const etapaSiguiente = estadoExamen.secuenciaExamen.testActual
+    ? mapearTipoTestAEtapa(estadoExamen.secuenciaExamen.testActual.tipo)
+    : 'ETAPA_4';
+  estadoExamen.etapa = etapaSiguiente;
   
   return {
     ok: true,
@@ -1879,7 +1854,7 @@ function generarPasosEtapa3() {
       }
     ],
     contexto: {
-      etapa: 'ETAPA_4',
+      etapa: estadoExamen.etapa,
       testActual: estadoExamen.secuenciaExamen.testActual,
       totalTests: secuencia.length,
       indiceActual: 0
