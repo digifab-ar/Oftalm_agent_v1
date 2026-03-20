@@ -20,44 +20,29 @@ El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (agudeza, e
   - `'testbin'`: modo prueba de **test binocular**.
 
 - **Inicialización y reinicio**
-  - En `inicializarExamen()`:
-    - `estadoExamen.modo` se inicializa siempre en `'normal'`.
+  - En `inicializarExamen(modo?)`:
+    - si se pasa un `modo` válido, inicializa con ese modo.
+    - si no se pasa modo, inicializa en `'normal'`.
   - En el endpoint `POST /api/examen/reiniciar`:
-    - Se llama a `inicializarExamen()` y, por diseño, `modo` vuelve a `'normal'`.
+    - sin body (o sin `modo`) reinicia en `'normal'`.
+    - con body válido (`testag`, `testesf`, `testcil`, `testbin`) reinicia en ese modo de prueba.
 
 ---
 
-### 2. Comandos de activación de modo prueba
+### 2. Activación de modo prueba por endpoint `reiniciar`
 
-Los comandos de modo prueba se introducen **en la etapa de valores iniciales (ETAPA_1)**, respondiendo al prompt que hoy pide:
+La activación del modo prueba se hace exclusivamente vía endpoint:
 
-> "Escribí los valores del autorefractómetro. Ejemplo: \<R> +0.75 , -1.75 , 60 / \<L> +2.75 , 0.00 , 0"
+- **Endpoint:** `POST /api/examen/reiniciar`
+- **Body opcional:** `{ "modo": "normal" | "testag" | "testesf" | "testcil" | "testbin" }`
 
-- **Comandos válidos (match exacto)**
-  - `testag`  → modo `'testag'`
-  - `testesf` → modo `'testesf'`
-  - `testcil` → modo `'testcil'`
-  - `testbin` → modo `'testbin'`
+Reglas:
 
-- **Reglas de matching**
-  - El texto debe coincidir **exactamente** con uno de los cuatro comandos anteriores.
-  - No se hace validación de:
-    - mayúsculas / minúsculas,
-    - tildes,
-    - palabras clave ni frases compuestas.
+1. Si no se envía body, o no se envía `modo`, el examen reinicia en modo `'normal'`.
+2. Si se envía un `modo` válido (`testag`, `testesf`, `testcil`, `testbin`), reinicia directamente en ese modo de prueba.
+3. Si se envía un modo inválido, el endpoint responde `400` con mensaje de error.
 
-- **Flujo en `procesarRespuestaEtapa1(respuestaPaciente)`**
-  1. Se intenta parsear valores con `validarValoresIniciales(texto)` (como hoy).
-     - Si es válido → se guardan `valoresIniciales` y se pasa a `ETAPA_2` (comportamiento actual).
-  2. Si **no** es válido:
-     - Se compara el texto con los comandos `testag`, `testesf`, `testcil`, `testbin`.
-     - Si coincide con alguno:
-       - Se setea `estadoExamen.modo` al valor correspondiente.
-       - Se devuelve un mensaje de confirmación implícita y se **piden nuevamente los valores iniciales**, por ejemplo:
-         - "Vamos a hacer un test de prueba de agudeza visual en ambos ojos. Ahora escribí los valores del autorefractómetro. Ejemplo: \<R> +0.75 , -1.75 , 60 / \<L> +2.75 , 0.00 , 0"
-       - No se pide una confirmación explícita "sí/no"; el flujo es directo.
-     - Si no coincide con ningún comando:
-       - Se mantiene el comportamiento actual: mensaje de "formato incorrecto" y se vuelven a pedir los valores.
+En este diseño, **ETAPA_1 solo procesa valores del autorefractómetro**. Ya no se activa el modo prueba por texto conversacional del paciente.
 
 ---
 
@@ -242,7 +227,7 @@ Esto permite al usuario distinguir exámenes normales de exámenes de prueba, ma
   - Repite exactamente los mensajes `hablar` que el backend le devuelve.
 
 - En modo prueba:
-  - La activación se hace exclusivamente en el backend al recibir `"testag"`, `"testesf"`, `"testcil"` o `"testbin"` en `ETAPA_1`.
+  - La activación se hace exclusivamente vía `POST /api/examen/reiniciar` enviando `{ "modo": "testag" | "testesf" | "testcil" | "testbin" }`.
   - El backend enviará mensajes claros al paciente indicando que se trata de un **test de prueba** y especificando qué componente se está probando.
 
 Con este diseño, el modo de examen de prueba:
