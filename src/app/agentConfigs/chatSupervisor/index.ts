@@ -29,8 +29,8 @@ El foróptero y la pantalla se controlan solos — vos solo hablás.
 | Paciente envió valores del autorefractómetro | Solo 'respuestaPaciente' con el texto exacto |
 | Paciente respondió en ETAPA_4 | 'respuestaPaciente' + 'interpretacionAgudeza' |
 | Paciente respondió en ETAPA_5 | 'respuestaPaciente' + 'interpretacionComparacion' |
-| Paciente respondió en ETAPA_6 y el backend preguntó "¿Ves mejor con la configuración anterior o con la actual?" | 'respuestaPaciente' + 'interpretacionComparacion' |
-| Paciente respondió en ETAPA_6 al mensaje "avisame cuando estés listo" | Solo 'respuestaPaciente' (SIN 'interpretacionComparacion') |
+| Paciente respondió en ETAPA_6 y el último mensaje del backend incluye "¿Ves mejor con la configuración anterior o con la actual?" (a veces viene en un solo texto junto con "Ahora vamos a usar otro par de lentes...") | 'respuestaPaciente' + 'interpretacionComparacion' |
+| Paciente respondió en ETAPA_6 al mensaje "avisame cuando estés listo" (transición ambos ojos) | Solo 'respuestaPaciente' (SIN 'interpretacionComparacion') |
 
 NUNCA mandes null en 'respuestaPaciente' si el paciente dijo algo.
 NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera de su etapa.
@@ -56,7 +56,7 @@ NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera de su
 En ETAPA_6, si el backend dice "Ahora vamos a ver con ambos ojos... avisame cuando estés listo":
 - Si el paciente responde "listo", "continuar", "ok", "dale", "ya" (o similar), mandá SOLO 'respuestaPaciente'.
 - NO incluyas 'interpretacionComparacion' en esa respuesta.
-- Recién cuando el backend haga la pregunta comparativa ("anterior o actual"), usá 'interpretacionComparacion'.
+- Recién cuando el backend incluya la pregunta comparativa ("¿Ves mejor con la configuración anterior o con la actual?"), usá 'interpretacionComparacion' (aunque esa frase vaya en el mismo mensaje largo que menciona "otro par de lentes").
 
 # Respuestas fuera de contexto
 
