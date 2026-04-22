@@ -28,7 +28,9 @@ El foróptero y la pantalla se controlan solos — vos solo hablás.
 | Inicio o no sabés qué hacer | Sin parámetros — body vacío {} |
 | Paciente envió valores del autorefractómetro | Solo 'respuestaPaciente' con el texto exacto |
 | Paciente respondió en ETAPA_4 | 'respuestaPaciente' + 'interpretacionAgudeza' |
-| Paciente respondió en ETAPA_5 o ETAPA_6 | 'respuestaPaciente' + 'interpretacionComparacion' |
+| Paciente respondió en ETAPA_5 | 'respuestaPaciente' + 'interpretacionComparacion' |
+| Paciente respondió en ETAPA_6 y el backend preguntó "¿Ves mejor con la configuración anterior o con la actual?" | 'respuestaPaciente' + 'interpretacionComparacion' |
+| Paciente respondió en ETAPA_6 al mensaje "avisame cuando estés listo" | Solo 'respuestaPaciente' (SIN 'interpretacionComparacion') |
 
 NUNCA mandes null en 'respuestaPaciente' si el paciente dijo algo.
 NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera de su etapa.
@@ -50,6 +52,11 @@ NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera de su
 | "el anterior", "el otro", "el primero" | "anterior" |
 | "este", "el actual", "con este" | "actual" |
 | "igual", "lo mismo", "no hay diferencia" | "igual" |
+
+En ETAPA_6, si el backend dice "Ahora vamos a ver con ambos ojos... avisame cuando estés listo":
+- Si el paciente responde "listo", "continuar", "ok", "dale", "ya" (o similar), mandá SOLO 'respuestaPaciente'.
+- NO incluyas 'interpretacionComparacion' en esa respuesta.
+- Recién cuando el backend haga la pregunta comparativa ("anterior o actual"), usá 'interpretacionComparacion'.
 
 # Respuestas fuera de contexto
 
@@ -94,7 +101,7 @@ export const chatAgent = new RealtimeAgent({
     // y solo retorna pasos de tipo "hablar" para que el agente ejecute
     tool({
       name: 'obtenerEtapa',
-      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en test de comparación de lentes (ETAPA_5) o test binocular (ETAPA_6), también incluye interpretacionComparacion con la interpretación estructurada de la preferencia.',
+      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en test de comparación de lentes (ETAPA_5), incluye interpretacionComparacion. En ETAPA_6, incluye interpretacionComparacion solo cuando el backend esté preguntando preferencia anterior/actual.',
       parameters: {
         type: 'object',
         properties: {
@@ -125,7 +132,7 @@ export const chatAgent = new RealtimeAgent({
           interpretacionComparacion: {
             type: 'object',
             nullable: true,
-            description: 'Interpretación estructurada de la respuesta del paciente en test de comparación de lentes o test binocular. Solo incluir si estás en ETAPA_5 o ETAPA_6 y el paciente acaba de responder sobre su preferencia de lentes.',
+            description: 'Interpretación estructurada de la respuesta del paciente en comparación de lentes. Incluir en ETAPA_5 y en ETAPA_6 solo cuando el backend pregunte preferencia entre configuración anterior/actual.',
             properties: {
               preferencia: {
                 type: 'string',
