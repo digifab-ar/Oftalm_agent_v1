@@ -119,7 +119,7 @@ Documento cerrado con las decisiones del producto (respuestas 1–11). **Etapa 2
 
 ## 6. Fuera de alcance (recordatorio)
 
-- Subida de logMAR si el paciente no ve al iniciar **esférico grueso** (etapa 2).
+- Subida de logMAR si el paciente no ve al iniciar **esférico grueso** (etapa 2) — plan de implementación: [`PLAN_IMPLEMENTACION_ETAPA2_LOGMAR_GRUESO.md`](./PLAN_IMPLEMENTACION_ETAPA2_LOGMAR_GRUESO.md) (contradicciones §4; **soluciones documentadas §10**).
 - Reanudación / checkpoint de examen.
 - Renombrar campo `agudezaInicial`.
 - Cambios de copy en mensajes binocular salvo lo estrictamente ligado a constantes si el código interpolara logMAR (si hoy es solo constante en TV, no aplica).

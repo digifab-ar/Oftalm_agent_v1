@@ -28,14 +28,13 @@ El foróptero y la pantalla se controlan solos — vos solo hablás.
 | Inicio o no sabés qué hacer | Sin parámetros — body vacío {} |
 | Paciente envió valores del autorefractómetro | Solo 'respuestaPaciente' con el texto exacto |
 | Paciente respondió en ETAPA_4 | 'respuestaPaciente' + 'interpretacionAgudeza' |
-| Paciente respondió en ETAPA_5 | 'respuestaPaciente' + 'interpretacionComparacion' |
-| Paciente respondió en ETAPA_5 al mensaje de cambio de ojo ("avisame cuando estés listo" / adaptación ojo izquierdo o derecho; en contexto aparece esperaListoCambioOjo o adaptacionCambioOjo) | Solo 'respuestaPaciente' (SIN 'interpretacionComparacion') |
+| Paciente respondió en ETAPA_5 en comparación de lentes (pregunta "¿Ves mejor con este o con el anterior?") | 'respuestaPaciente' + 'interpretacionComparacion' |
+| Paciente respondió en ETAPA_5 en pre-grueso visual (mensaje "decime si ves bien" o "¿Ahora ves bien o necesitás un ajuste más?"; en contexto: ajusteLogmarPreGrueso: true) | 'respuestaPaciente' + 'interpretacionAgudeza' (misma tabla que ETAPA_4: ve bien = correcta; borroso / no ve / más ajuste = no_ve o borroso) |
 | Paciente respondió en ETAPA_6 y el último mensaje del backend incluye "¿Ves mejor con la configuración anterior o con la actual?" (a veces viene en un solo texto junto con "Ahora vamos a usar otro par de lentes...") | 'respuestaPaciente' + 'interpretacionComparacion' |
 | Paciente respondió en ETAPA_6 al mensaje "avisame cuando estés listo" (transición ambos ojos) | Solo 'respuestaPaciente' (SIN 'interpretacionComparacion') |
 
 NUNCA mandes null en 'respuestaPaciente' si el paciente dijo algo.
-NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera de su etapa.
-En ETAPA_5, si el backend indica transición de ojo (en contexto: esperaListoCambioOjo o adaptacionCambioOjo) y el paciente dice "listo", "dale", "ok", etc., mandá SOLO 'respuestaPaciente' — igual que la transición "avisame listo" en binocular.
+NUNCA agregues 'interpretacionAgudeza' o 'interpretacionComparacion' fuera del caso que indique el contexto (ETAPA_4 o pre-grueso con ajusteLogmarPreGrueso → agudeza; comparación de lentes en ETAPA_5/6 → comparación).
 
 # Cómo interpretar la respuesta del paciente según la etapa
 
@@ -55,9 +54,10 @@ En ETAPA_5, si el backend indica transición de ojo (en contexto: esperaListoCam
 | "este", "el actual", "con este" | "actual" |
 | "igual", "lo mismo", "no hay diferencia" | "igual" |
 
-En ETAPA_5, si el contexto trae esperaListoCambioOjo o adaptacionCambioOjo (transición al otro ojo, mensaje "avisame cuando estés listo"):
-- Si el paciente responde "listo", "continuar", "ok", "dale", "ya" (o similar), mandá SOLO 'respuestaPaciente'.
-- NO incluyas 'interpretacionComparacion' en esa respuesta.
+En ETAPA_5, si el contexto trae ajusteLogmarPreGrueso: true (calidad visual antes del esférico grueso, ojo derecho u ojo izquierdo tras cambio):
+- Mandá 'respuestaPaciente' + 'interpretacionAgudeza' (no uses interpretacionComparacion hasta la pregunta comparativa de lentes).
+- "Ves bien" / claro / sí → resultado "correcta" (letraIdentificada "H" o null).
+- Borroso, no ve, pide fila más grande o más ajuste → "borroso" o "no_ve" (letra null); el motor sube el logMAR.
 - Recién en la pregunta comparativa ("¿Ves mejor con este o con el anterior?"), usá 'interpretacionComparacion'.
 
 En ETAPA_6, si el backend dice "Ahora vamos a ver con ambos ojos... avisame cuando estés listo":
@@ -108,7 +108,7 @@ export const chatAgent = new RealtimeAgent({
     // y solo retorna pasos de tipo "hablar" para que el agente ejecute
     tool({
       name: 'obtenerEtapa',
-      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye la respuesta en respuestaPaciente. Si estás en test de agudeza visual (ETAPA_4), también incluye interpretacionAgudeza. Si estás en ETAPA_5 en comparación de lentes (pregunta mejor anterior/actual), incluye interpretacionComparacion; si el contexto indica espera de "listo" tras cambio de ojo (adaptacionCambioOjo / esperaListoCambioOjo), solo respuestaPaciente. En ETAPA_6, incluye interpretacionComparacion solo cuando el backend esté preguntando preferencia anterior/actual.',
+      description: 'Devuelve instrucciones para la etapa actual del examen. Si el paciente acaba de responder, incluye respuestaPaciente. Incluye interpretacionAgudeza en ETAPA_4 (agudeza) y en ETAPA_5 cuando el contexto traiga ajusteLogmarPreGrueso (calidad visual antes del esférico grueso). Incluye interpretacionComparacion en ETAPA_5 solo en la pregunta comparativa de lentes (mejor anterior/actual), y en ETAPA_6 solo cuando el backend pregunte preferencia anterior/actual.',
       parameters: {
         type: 'object',
         properties: {
@@ -120,7 +120,7 @@ export const chatAgent = new RealtimeAgent({
           interpretacionAgudeza: {
             type: 'object',
             nullable: true,
-            description: 'Interpretación estructurada de la respuesta del paciente en test de agudeza visual. Solo incluir si estás en ETAPA_4 y el paciente acaba de responder.',
+            description: 'Interpretación estructurada en ETAPA_4 (agudeza) y en ETAPA_5 cuando contexto.ajusteLogmarPreGrueso es true (¿ves bien? / calidad visual antes del grueso). Incluir resultado y letraIdentificada según las tablas del prompt.',
             properties: {
               resultado: {
                 type: 'string',

@@ -125,11 +125,19 @@ let estadoExamen = {
   respuestaPendiente: null,
 
   /**
-   * Tras agudeza_alcanzada de un ojo, antes del primer esferico_grueso del otro:
-   * foróptero + TV + mensaje "avisame listo"; hasta recibir listo no arranca la comparación.
-   * null | { ojo: 'R'|'L', fase: 'esperando_listo' | 'hecha' }
+   * Obsoleto: antes se usaba espera de "listo" tras cambio de ojo (Etapa 2 = pre-grueso visual).
+   * Se mantiene la clave en null por compatibilidad.
    */
   esperaListoCambioOjo: null,
+
+  /**
+   * Antes del primer esferico_grueso de un ojo: "¿ves bien?" + ajuste logMAR (TV H).
+   * null | { activa: true, ojo: 'R'|'L', logmarEnPantalla: number, faseDialogo: string }
+   */
+  preGruesoVisual: null,
+
+  /** Índice de secuencia para el que ya se emitió el bundle de adaptación + pre-grueso (cambio de ojo). */
+  adaptacionPreGruesoEmitidaParaIndice: null,
   
   // Secuencia del examen
   secuenciaExamen: {
@@ -242,6 +250,8 @@ export function inicializarExamen(modo = 'normal') {
     },
     respuestaPendiente: null,
     esperaListoCambioOjo: null,
+    preGruesoVisual: null,
+    adaptacionPreGruesoEmitidaParaIndice: null,
     secuenciaExamen: {
       testsActivos: [],
       indiceActual: 0,
@@ -872,13 +882,17 @@ function calcularValoresFinalesForoptero(ojo) {
 /** logMAR por defecto antes de lentes y en agudeza_alcanzada (baseline operativa, no medición). */
 const LOGMAR_ARRANQUE_LENTES = 0.3;
 
-const MSG_ADAPTACION_CAMBIO_OJO = {
-  L: 'Ahora vamos con el ojo izquierdo. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.',
-  R: 'Ahora vamos con el ojo derecho. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.'
-};
+/** Textos literales — PLAN_IMPLEMENTACION_ETAPA2_LOGMAR_GRUESO §3.4 */
+const MSG_PRE_GRUESO_OD =
+  'Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes y luego decime si ves bien.';
+const MSG_PRE_GRUESO_OI =
+  'Ahora vamos con el ojo izquierdo. Esperemos a que se terminen de ajustar los lentes y decime si ves bien.';
+const MSG_REPREGUNTA_AJUSTE = '¿Ahora ves bien o necesitás un ajuste más?';
+const MSG_LOGMAR_MAX_PRE_GRUESO =
+  'Ya estamos en la fila más grande disponible. Seguimos con esta y pasamos a la comparación de lentes.';
 
 /**
- * Tras agudeza alcanzada en un ojo, el primer esferico_grueso del otro ojo requiere adaptación + "listo".
+ * Tras agudeza alcanzada en un ojo, el primer esferico_grueso del otro ojo requiere adaptación + pre-grueso visual.
  */
 function necesitaAdaptacionTrasAgudezaOtroOjo(testActual) {
   if (!testActual || testActual.tipo !== 'esferico_grueso') return false;
@@ -889,31 +903,18 @@ function necesitaAdaptacionTrasAgudezaOtroOjo(testActual) {
   return prev.ojo !== testActual.ojo;
 }
 
-/** Misma heurística que continuidad binocular ("listo", "dale", etc.). */
-function esRespuestaListoAdaptacionOjo(respuestaPaciente = '') {
-  const t = String(respuestaPaciente || '').toLowerCase().trim();
-  if (!t) return false;
-  const patrones = [
-    /\blisto\b/,
-    /\bcontinu(ar|emos)?\b/,
-    /\bok\b/,
-    /\bdale\b/,
-    /\bya\b/,
-    /\bseguimos\b/,
-    /\bsi\b/,
-    /\bs[ií]\b/
-  ];
-  return patrones.some((re) => re.test(t));
-}
-
 /**
- * Fija baseline de agudeza por ojo antes del primer esferico_grueso (plan etapa 1).
+ * Fija baseline de agudeza por ojo antes del primer esferico_grueso.
+ * Si ya hubo confirmación en pre-grueso visual (logMAR fijado), la respeta.
  * @param {'R'|'L'} ojo
  */
 function asegurarBaselineAgudezaLentes(ojo) {
-  estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial = LOGMAR_ARRANQUE_LENTES;
+  const av = estadoExamen.agudezaVisual[ojo];
+  const base =
+    av && av.logmar != null && av.confirmado ? av.logmar : LOGMAR_ARRANQUE_LENTES;
+  estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial = base;
   estadoExamen.agudezaVisual[ojo] = {
-    logmar: LOGMAR_ARRANQUE_LENTES,
+    logmar: base,
     letra: 'H',
     confirmado: true
   };
@@ -1411,7 +1412,10 @@ function generarPasosEtapa3() {
   estadoExamen.secuenciaExamen.testsActivos = secuencia;
   estadoExamen.secuenciaExamen.indiceActual = 0;
   estadoExamen.secuenciaExamen.testActual = secuencia[0] || null;
-  
+  const primerTest = secuencia[0];
+  const primerEsGruesoR =
+    primerTest?.tipo === 'esferico_grueso' && primerTest?.ojo === 'R';
+
   console.log('✅ Secuencia del examen generada:');
   console.log('  Total de tests:', secuencia.length);
   console.log('  Tests activos:', secuencia.map(t => `${t.tipo}(${t.ojo})`).join(', '));
@@ -1436,41 +1440,74 @@ function generarPasosEtapa3() {
     ? mapearTipoTestAEtapa(estadoExamen.secuenciaExamen.testActual.tipo)
     : 'ETAPA_4';
   estadoExamen.etapa = etapaSiguiente;
-  
-  return {
-    ok: true,
-    pasos: [
-      {
-        tipo: 'foroptero',
-        orden: 1,
-        foroptero: {
-          R: {
-            esfera: valoresR.esfera,
-            cilindro: valoresR.cilindro,
-            angulo: valoresR.angulo,
-            occlusion: 'open'
-          },
-          L: {
-            occlusion: 'close'
-          }
+
+  const pasosEt3 = [
+    {
+      tipo: 'foroptero',
+      orden: 1,
+      foroptero: {
+        R: {
+          esfera: valoresR.esfera,
+          cilindro: valoresR.cilindro,
+          angulo: valoresR.angulo,
+          occlusion: 'open'
+        },
+        L: {
+          occlusion: 'close'
         }
-      },
+      }
+    },
+    {
+      tipo: 'esperar',
+      orden: 2,
+      esperarSegundos: 2
+    }
+  ];
+
+  if (primerEsGruesoR) {
+    pasosEt3.push(
+      { tipo: 'esperar_foroptero', orden: 3 },
       {
-        tipo: 'esperar',
-        orden: 2,
-        esperarSegundos: 2
+        tipo: 'tv',
+        orden: 4,
+        letra: 'H',
+        logmar: LOGMAR_ARRANQUE_LENTES
       },
       {
         tipo: 'hablar',
-        orden: 3,
-        mensaje: 'Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes.'
+        orden: 5,
+        mensaje: MSG_PRE_GRUESO_OD
       }
-    ],
+    );
+    estadoExamen.preGruesoVisual = {
+      activa: true,
+      ojo: 'R',
+      logmarEnPantalla: LOGMAR_ARRANQUE_LENTES,
+      faseDialogo: 'inicial_od'
+    };
+  } else {
+    pasosEt3.push({
+      tipo: 'hablar',
+      orden: 3,
+      mensaje:
+        'Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes.'
+    });
+  }
+
+  return {
+    ok: true,
+    pasos: pasosEt3,
     contexto: {
       etapa: estadoExamen.etapa,
       testActual: estadoExamen.secuenciaExamen.testActual,
       totalTests: secuencia.length,
-      indiceActual: 0
+      indiceActual: 0,
+      ...(primerEsGruesoR
+        ? {
+            ajusteLogmarPreGrueso: true,
+            logmarPreGrueso: LOGMAR_ARRANQUE_LENTES
+          }
+        : {})
     }
   };
 }
@@ -1564,54 +1601,128 @@ async function ejecutarPasosAutomaticamente(pasos) {
 }
 
 /**
+ * Ajuste logMAR antes del primer esferico_grueso (plan etapa 2): interpretacionAgudeza + TV H.
+ */
+async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacionAgudeza) {
+  const pg = estadoExamen.preGruesoVisual;
+  if (!pg?.activa) {
+    return { ok: false, error: 'Estado interno: preGruesoVisual inactivo' };
+  }
+  const ojo = pg.ojo;
+  const resultado = interpretacionAgudeza?.resultado;
+
+  if (resultado === 'correcta') {
+    estadoExamen.agudezaVisual[ojo] = {
+      logmar: pg.logmarEnPantalla,
+      letra: 'H',
+      confirmado: true
+    };
+    estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial = pg.logmarEnPantalla;
+    estadoExamen.preGruesoVisual = null;
+    estadoExamen.esperaListoCambioOjo = null;
+
+    const pasos = generarPasosEtapa5();
+    await ejecutarPasosAutomaticamente(pasos.pasos || []);
+    const pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+    return {
+      ok: true,
+      pasos: pasosParaAgente,
+      contexto:
+        pasos.contexto || {
+          etapa: estadoExamen.etapa,
+          testActual: estadoExamen.secuenciaExamen.testActual
+        }
+    };
+  }
+
+  const lmActual = pg.logmarEnPantalla;
+  const siguiente = subirLogMAR(lmActual);
+
+  if (siguiente === lmActual) {
+    console.warn('[preGruesoVisual] Saturación logMAR', {
+      ojo,
+      logmar: lmActual,
+      respuestaPaciente,
+      resultado
+    });
+    estadoExamen.agudezaVisual[ojo] = {
+      logmar: lmActual,
+      letra: 'H',
+      confirmado: true
+    };
+    estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial = lmActual;
+    estadoExamen.preGruesoVisual = null;
+    estadoExamen.esperaListoCambioOjo = null;
+
+    const pasos = generarPasosEtapa5();
+    await ejecutarPasosAutomaticamente(pasos.pasos || []);
+    let pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+    if (pasosParaAgente.length > 0) {
+      pasosParaAgente = [
+        { tipo: 'hablar', orden: 1, mensaje: MSG_LOGMAR_MAX_PRE_GRUESO },
+        ...pasosParaAgente.map((p, i) => ({ ...p, orden: i + 2 }))
+      ];
+    } else {
+      pasosParaAgente = [{ tipo: 'hablar', orden: 1, mensaje: MSG_LOGMAR_MAX_PRE_GRUESO }];
+    }
+    return {
+      ok: true,
+      pasos: pasosParaAgente,
+      contexto:
+        pasos.contexto || {
+          etapa: estadoExamen.etapa,
+          testActual: estadoExamen.secuenciaExamen.testActual
+        }
+    };
+  }
+
+  pg.logmarEnPantalla = siguiente;
+  pg.faseDialogo = 'repregunta_ajuste';
+
+  const pasosIter = [
+    { tipo: 'tv', orden: 1, letra: 'H', logmar: siguiente },
+    { tipo: 'hablar', orden: 2, mensaje: MSG_REPREGUNTA_AJUSTE }
+  ];
+  await ejecutarPasosAutomaticamente(pasosIter);
+  return {
+    ok: true,
+    pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_REPREGUNTA_AJUSTE }],
+    contexto: {
+      etapa: estadoExamen.etapa,
+      testActual: estadoExamen.secuenciaExamen.testActual,
+      ajusteLogmarPreGrueso: true,
+      logmarPreGrueso: siguiente
+    }
+  };
+}
+
+/**
  * Obtiene instrucciones (pasos) para el agente
  * Si hay respuestaPaciente, la procesa primero
  * Ejecuta automáticamente los comandos de dispositivos (foróptero, TV)
  * y solo retorna pasos de tipo "hablar" al agente
  * @param {string|null} respuestaPaciente - Respuesta del paciente
- * @param {object|null} interpretacionAgudeza - Interpretación estructurada del agente (para ETAPA_4)
+ * @param {object|null} interpretacionAgudeza - Interpretación estructurada del agente (ETAPA_4 y pre-grueso visual)
  */
 export async function obtenerInstrucciones(respuestaPaciente = null, interpretacionAgudeza = null, interpretacionComparacion = null) {
   // Si hay respuesta del paciente, procesarla primero
   if (respuestaPaciente) {
-    const testActualRef = estadoExamen.secuenciaExamen.testActual;
-    // ETAPA_5 — tras agudeza del otro ojo: esperar "listo" antes de la primera comparación
-    if (
-      estadoExamen.etapa === 'ETAPA_5' &&
-      estadoExamen.esperaListoCambioOjo?.fase === 'esperando_listo' &&
-      testActualRef &&
-      necesitaAdaptacionTrasAgudezaOtroOjo(testActualRef)
-    ) {
-      if (esRespuestaListoAdaptacionOjo(respuestaPaciente)) {
-        estadoExamen.esperaListoCambioOjo = { ojo: testActualRef.ojo, fase: 'hecha' };
-        const pasos = generarPasosEtapa5();
-        await ejecutarPasosAutomaticamente(pasos.pasos || []);
-        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
+    if (estadoExamen.preGruesoVisual?.activa) {
+      if (!interpretacionAgudeza) {
         return {
-          ok: true,
-          pasos: pasosParaAgente,
-          contexto: pasos.contexto || {
-            etapa: estadoExamen.etapa,
-            testActual: estadoExamen.secuenciaExamen.testActual
-          }
+          ok: false,
+          error:
+            'Se requiere interpretacionAgudeza (calidad visual / ¿ves bien?) antes del esférico grueso.'
         };
       }
-      return {
-        ok: true,
-        pasos: [
-          {
-            tipo: 'hablar',
-            orden: 1,
-            mensaje: 'Cuando estés listo para seguir, avisame con un "listo" o "dale".'
-          }
-        ],
-        contexto: {
-          etapa: 'ETAPA_5',
-          testActual: estadoExamen.secuenciaExamen.testActual,
-          esperaListoCambioOjo: true,
-          adaptacionCambioOjo: true
-        }
-      };
+      const preRes = await procesarRespuestaPreGruesoVisual(
+        respuestaPaciente,
+        interpretacionAgudeza
+      );
+      if (!preRes.ok) {
+        return preRes;
+      }
+      return preRes;
     }
 
     // Si estamos en ETAPA_5 y hay interpretación de comparación, procesarla
@@ -2349,75 +2460,94 @@ function generarPasosEtapa5() {
   const tipo = testActual.tipo;
   const comparacion = estadoExamen.comparacionActual;
   const adaptNecesaria = necesitaAdaptacionTrasAgudezaOtroOjo(testActual);
-  const esp = estadoExamen.esperaListoCambioOjo;
+  const pg = estadoExamen.preGruesoVisual;
 
-  if (!adaptNecesaria && estadoExamen.esperaListoCambioOjo) {
+  if (!adaptNecesaria) {
     estadoExamen.esperaListoCambioOjo = null;
   }
 
-  if (adaptNecesaria && esp?.fase !== 'hecha') {
-    if (!esp || esp.ojo !== ojo) {
-      estadoExamen.esperaListoCambioOjo = { ojo, fase: 'esperando_listo' };
-      const vr = estadoExamen.valoresRecalculados[ojo];
-      const otro = ojo === 'R' ? 'L' : 'R';
-      const pasosAdaptacion = [
-        {
-          tipo: 'foroptero',
-          orden: 1,
-          foroptero: {
-            [ojo]: {
-              esfera: vr.esfera,
-              cilindro: vr.cilindro,
-              angulo: vr.angulo,
-              occlusion: 'open'
-            },
-            [otro]: {
-              occlusion: 'close'
-            }
-          }
-        },
-        { tipo: 'esperar_foroptero', orden: 2 },
-        {
-          tipo: 'tv',
-          orden: 3,
-          letra: 'H',
-          logmar: LOGMAR_ARRANQUE_LENTES
-        },
+  if (pg?.activa) {
+    const msg =
+      pg.faseDialogo === 'repregunta_ajuste'
+        ? MSG_REPREGUNTA_AJUSTE
+        : pg.faseDialogo === 'inicial_oi'
+          ? MSG_PRE_GRUESO_OI
+          : MSG_PRE_GRUESO_OD;
+    return {
+      ok: true,
+      pasos: [
         {
           tipo: 'hablar',
-          orden: 4,
-          mensaje: MSG_ADAPTACION_CAMBIO_OJO[ojo]
+          orden: 1,
+          mensaje: msg
         }
-      ];
-      return {
-        ok: true,
-        pasos: pasosAdaptacion,
-        contexto: {
-          etapa: 'ETAPA_5',
-          testActual,
-          esperaListoCambioOjo: true,
-          adaptacionCambioOjo: true
-        }
-      };
-    }
-    if (esp.fase === 'esperando_listo') {
-      return {
-        ok: true,
-        pasos: [
-          {
-            tipo: 'hablar',
-            orden: 1,
-            mensaje: MSG_ADAPTACION_CAMBIO_OJO[ojo]
+      ],
+      contexto: {
+        etapa: 'ETAPA_5',
+        testActual,
+        ajusteLogmarPreGrueso: true,
+        logmarPreGrueso: pg.logmarEnPantalla,
+        adaptacionCambioOjo: adaptNecesaria
+      }
+    };
+  }
+
+  const idxActual = estadoExamen.secuenciaExamen.indiceActual;
+  const debeEmitirBundleAdaptacion =
+    adaptNecesaria &&
+    !pg &&
+    estadoExamen.adaptacionPreGruesoEmitidaParaIndice !== idxActual;
+
+  if (debeEmitirBundleAdaptacion) {
+    const vr = estadoExamen.valoresRecalculados[ojo];
+    const otro = ojo === 'R' ? 'L' : 'R';
+    estadoExamen.adaptacionPreGruesoEmitidaParaIndice = idxActual;
+    estadoExamen.preGruesoVisual = {
+      activa: true,
+      ojo,
+      logmarEnPantalla: LOGMAR_ARRANQUE_LENTES,
+      faseDialogo: ojo === 'L' ? 'inicial_oi' : 'inicial_od'
+    };
+    const pasosAdaptacion = [
+      {
+        tipo: 'foroptero',
+        orden: 1,
+        foroptero: {
+          [ojo]: {
+            esfera: vr.esfera,
+            cilindro: vr.cilindro,
+            angulo: vr.angulo,
+            occlusion: 'open'
+          },
+          [otro]: {
+            occlusion: 'close'
           }
-        ],
-        contexto: {
-          etapa: 'ETAPA_5',
-          testActual,
-          esperaListoCambioOjo: true,
-          adaptacionCambioOjo: true
         }
-      };
-    }
+      },
+      { tipo: 'esperar_foroptero', orden: 2 },
+      {
+        tipo: 'tv',
+        orden: 3,
+        letra: 'H',
+        logmar: LOGMAR_ARRANQUE_LENTES
+      },
+      {
+        tipo: 'hablar',
+        orden: 4,
+        mensaje: ojo === 'L' ? MSG_PRE_GRUESO_OI : MSG_PRE_GRUESO_OD
+      }
+    ];
+    return {
+      ok: true,
+      pasos: pasosAdaptacion,
+      contexto: {
+        etapa: 'ETAPA_5',
+        testActual,
+        ajusteLogmarPreGrueso: true,
+        logmarPreGrueso: LOGMAR_ARRANQUE_LENTES,
+        adaptacionCambioOjo: true
+      }
+    };
   }
 
   // Si no hay comparación iniciada o es un tipo diferente, inicializarla
