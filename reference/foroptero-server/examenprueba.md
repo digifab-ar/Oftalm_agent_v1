@@ -60,27 +60,32 @@ El modo de examen (normal o prueba) solo afecta a partir de **ETAPA_3 (preparaci
 
 ### 4. Generación de secuencia según modo (ETAPA_3)
 
-En la lógica actual de **ETAPA_3**, se genera la secuencia completa del examen:
+En **ETAPA_3** (`generarPasosEtapa3` en `motorExamen.js`):
 
-- Hoy:
-  - `const secuencia = generarSecuenciaExamen();`
-  - `estadoExamen.secuenciaExamen.testsActivos = secuencia;`
-  - `indiceActual`, `testActual` y `etapa` se inicializan en base a esa secuencia.
+1. **Secuencia**
+   - Si `estadoExamen.modo === 'normal'` → `generarSecuenciaExamen()`.
+   - Si no → `generarSecuenciaPrueba(estadoExamen.modo)`.
 
-Con modo prueba se ajusta de la siguiente forma:
+2. **Estado**
+   - Se guardan `testsActivos`, `indiceActual = 0`, `testActual = secuencia[0]`.
+   - `subEtapa = 'FOROPTERO_CONFIGURADO'`.
 
-- **Modo normal (`modo === 'normal'`)**
-  - Se mantiene exactamente la lógica actual:
-    - `testsActivos = generarSecuenciaExamen();`
+3. **Transición de etapa (crítico para el agente y para `/instrucciones`)**
+   - Tras definir `testActual`, se asigna:
+     - `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)`
+   - Mapeo estándar:
+     - `agudeza_inicial`, `agudeza_alcanzada` → **ETAPA_4**
+     - `esferico_grueso`, `esferico_fino`, `cilindrico`, `cilindrico_angulo` → **ETAPA_5**
+     - `binocular` → **ETAPA_6**
 
-- **Modo prueba (`modo !== 'normal'`)**
-  - Se utiliza una nueva función:
-    - `testsActivos = generarSecuenciaPrueba(estadoExamen.modo);`
-  - Luego se inicializan:
-    - `indiceActual = 0`
-    - `testActual = testsActivos[0] || null`
-    - `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)`
-  - El resto de la lógica de ETAPA_3 (configuración de foróptero inicial, ojo actual, mensajes al paciente) se mantiene, ajustándose automáticamente a que la secuencia sea más corta.
+4. **Respuesta al cliente**
+   - El objeto `contexto.etapa` devuelto por `obtenerInstrucciones` debe coincidir con `estadoExamen.etapa` (no forzar siempre `ETAPA_4`).
+   - Si `subEtapa === 'FOROPTERO_CONFIGURADO'` y se vuelve a pedir pasos, la etapa se recalcula igualmente desde `testActual`.
+
+**Bug corregido (modos testesf / testcil / testbin):**  
+Antes, ETAPA_3 dejaba fijo `ETAPA_4` aunque el primer test fuera esférico, cilíndrico o binocular. El agente enviaba entonces `interpretacionAgudeza` y el backend respondía error. Con la etapa alineada al tipo de test, el agente usa `interpretacionComparacion` en ETAPA_5 y ETAPA_6.
+
+El resto de ETAPA_3 (comando foróptero inicial R abierto / L cerrado, espera, mensaje de “ojo derecho”) se mantiene; en modos que empiezan por test no-agudeza el mensaje puede ser genérico hasta que el motor refine textos por tipo de test.
 
 ---
 
@@ -151,11 +156,9 @@ En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando apl
 - Secuencia:
   - `[{ tipo: 'binocular', ojo: 'B' }]`
 - Consideraciones:
-  - Se reutiliza la lógica actual de **ETAPA_6** para test binocular:
-    - uso de `binocularEstado`,
-    - esferas iniciales R/L,
-    - estrategia de comparación y confirmación.
-  - En este modo, el test binocular se ejecuta sin requerir que se hayan ejecutado previamente todos los tests monoculares del examen completo.
+  - **ETAPA_6** sigue `DEFINICIONES_EXAMEN_BINOCULAR.md`: transición *listo*; dos comparaciones (esfera y, si aplica, cilindro) con **variante ya aplicada** antes del `hablar` (mensaje combinado aviso + pregunta *anterior/actual*), TV H @ logMAR 0,4, resultado `{ esfera, cilindro, angulo }` por ojo.
+  - En `testbin`, la línea base es **solo** `valoresRecalculados` (completo por ojo); no hay fallback a `esfericoFino`.
+  - El test binocular se ejecuta sin requerir tests monoculares previos.
 
 ---
 
@@ -221,18 +224,47 @@ Esto permite al usuario distinguir exámenes normales de exámenes de prueba, ma
 
 ### 8. Integración con el agente `chatSupervisor`
 
-- El agente `chatSupervisor` **no requiere cambios**:
-  - Sigue llamando `obtenerEtapa()` al inicio y después de cada respuesta del paciente.
-  - Envía `respuestaPaciente` tal cual se introduce (p. ej. `"testag"`).
-  - Repite exactamente los mensajes `hablar` que el backend le devuelve.
+- El modo de examen **no** se activa por voz del paciente; solo por `POST /api/examen/reiniciar` (o panel de control).
+- El agente (`src/app/agentConfigs/chatSupervisor/index.ts`):
+  - Llama `obtenerEtapa()` al inicio y tras cada respuesta del paciente.
+  - Según `contexto.etapa` en la última respuesta del backend:
+    - **ETAPA_4** → envía `interpretacionAgudeza` cuando corresponde a test de letras.
+    - **ETAPA_5** o **ETAPA_6** → en general `interpretacionComparacion` para preferencia *anterior/actual/igual*; en ETAPA_6, **excepción:** solo `respuestaPaciente` en el mensaje de transición *“…avisame cuando estés listo”* (ver `chatSupervisor/index.ts` y `DEFINICIONES_EXAMEN_BINOCULAR.md`).
+    - **ETAPA_1** (valores iniciales) → envía `respuestaPaciente` con el texto literal (formato autorefractómetro).
+  - Repite los mensajes `hablar` que devuelve el backend.
 
 - En modo prueba:
   - La activación se hace exclusivamente vía `POST /api/examen/reiniciar` enviando `{ "modo": "testag" | "testesf" | "testcil" | "testbin" }`.
   - El backend enviará mensajes claros al paciente indicando que se trata de un **test de prueba** y especificando qué componente se está probando.
+- Tras reiniciar en modo prueba, el primer mensaje al operador/paciente puede venir en la respuesta de `reiniciar` (texto de “modo de prueba” + pedido de valores).
+
+---
+
+### 9. Panel de control Framer (`reference_framer/ForopteroControl.tsx`)
+
+Panel de referencia para operadores:
+
+- **Nuevo examen** → `POST /api/examen/reiniciar` con body `{ "modo": "normal" }`.
+- **Prueba AG / ESF / CIL / BIN** → mismo endpoint con `{ "modo": "testag" | "testesf" | "testcil" | "testbin" }`.
+- Polling de `GET /api/examen/detalle` para mostrar `detalle.modo`, valores, tests y estado.
+
+---
+
+### 10. Referencia de archivos
+
+| Archivo | Rol |
+|---------|-----|
+| `reference/foroptero-server/motorExamen.js` | `modo`, `inicializarExamen(modo)`, `generarSecuenciaPrueba`, ETAPA_3 con etapa según `testActual`, `obtenerDetalleExamen` con `modo` |
+| `reference/foroptero-server/server.js` | `POST /api/examen/reiniciar` con validación de `modo` |
+| `src/app/agentConfigs/chatSupervisor/index.ts` | Tool `obtenerEtapa` → `/api/examen/instrucciones` |
+| `reference_framer/ForopteroControl.tsx` | Botones de reinicio y modos de prueba |
+
+---
 
 Con este diseño, el modo de examen de prueba:
 
 - Reutiliza al máximo la lógica clínica ya existente.
 - Mantiene el flujo normal sin cambios cuando `modo === 'normal'`.
 - Proporciona secuencias de prueba claras, acotadas y trazables vía `/api/examen/detalle`.
+- Alinea **etapa interna** y **contexto** con el tipo de test para que el agente envíe el payload correcto a `/instrucciones`.
 

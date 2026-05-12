@@ -90,7 +90,7 @@ Servidor Express que orquesta la comunicación MQTT y expone endpoints HTTP.
 - `POST /api/examen/instrucciones` - Obtener pasos (ejecuta automáticamente)
 - `GET /api/examen/estado` - Estado actual del examen
 - `GET /api/examen/detalle` - Detalle completo del examen
-- `POST /api/examen/reiniciar` - Reiniciar examen
+- `POST /api/examen/reiniciar` - Reiniciar examen (modo opcional: normal/testag/testesf/testcil/testbin)
 
 **Funciones Internas:**
 - `ejecutarComandoForopteroInterno(config)` - Ejecuta comandos de foróptero internamente
@@ -102,7 +102,8 @@ Motor de examen visual implementado como state machine.
 **Estado del Examen:**
 ```javascript
 {
-  etapa: 'INICIO' | 'ETAPA_1' | 'ETAPA_2' | 'ETAPA_3' | 'ETAPA_4' | 'ETAPA_5' | 'FINALIZADO',
+  modo: 'normal' | 'testag' | 'testesf' | 'testcil' | 'testbin',
+  etapa: 'INICIO' | 'ETAPA_1' | 'ETAPA_2' | 'ETAPA_3' | 'ETAPA_4' | 'ETAPA_5' | 'ETAPA_6' | 'FINALIZADO',
   valoresIniciales: { R: {...}, L: {...} },
   valoresRecalculados: { R: {...}, L: {...} },
   secuenciaExamen: {
@@ -117,12 +118,30 @@ Motor de examen visual implementado como state machine.
 ```
 
 **Funciones Principales:**
-- `inicializarExamen()` - Resetea todo el estado
+- `inicializarExamen(modo?)` - Resetea todo el estado; `modo` opcional (`normal` por defecto; acepta modos de prueba)
 - `obtenerInstrucciones(respuestaPaciente, interpretacionAgudeza)` - Genera pasos y ejecuta comandos automáticamente
 - `generarPasos()` - Genera pasos según la etapa actual
 - `procesarRespuesta(respuestaPaciente)` - Procesa respuestas del paciente
 - `obtenerEstado()` - Estado actual del examen
-- `obtenerDetalleExamen()` - Detalle completo con todos los tests
+- `obtenerDetalleExamen()` - Detalle completo con todos los tests (incluye `detalle.modo`)
+
+### Modo de examen de prueba
+
+- **Documentación detallada:** `reference/foroptero-server/examenprueba.md`
+- **Activación:** `POST /api/examen/reiniciar` con body opcional `{ "modo": "normal" | "testag" | "testesf" | "testcil" | "testbin" }`. Sin `modo` → `normal`.
+- **Secuencia:** En modo distinto de `normal` se usa `generarSecuenciaPrueba(modo)` en lugar de la secuencia completa.
+- **ETAPA_3:** Tras armar la secuencia, `estadoExamen.etapa` y el `contexto.etapa` de la respuesta HTTP se alinean con el primer `testActual` vía `mapearTipoTestAEtapa` (ETAPA_4 agudeza, ETAPA_5 lentes, ETAPA_6 binocular), para que el agente envíe `interpretacionAgudeza` o `interpretacionComparacion` según corresponda.
+- **Especificación binocular (definiciones acordadas):** `reference/foroptero-server/DEFINICIONES_EXAMEN_BINOCULAR.md`
+- **Plan de implementación binocular:** `reference/foroptero-server/PLAN_IMPLEMENTACION_EXAMEN_BINOCULAR.md`
+- **Panel operador (referencia):** `reference_framer/ForopteroControl.tsx` — botones “Nuevo examen” y modos de prueba que llaman a `reiniciar` con el `modo` adecuado.
+
+#### ETAPA_6 — Examen binocular (implementado en motor)
+
+- **Secuencia en examen normal:** tras `agudeza_alcanzada` de L, el test `binocular` (`testActual.ojo: 'B'`) aplica ajuste final con **ambos ojos abiertos** (línea base: esférico fino por ojo; cilindro/eje según test cilíndrico o `valoresRecalculados` — ver `DEFINICIONES_EXAMEN_BINOCULAR.md`).
+- **Transición clínica:** foróptero en base, TV H @ logMAR 0,4, mensaje *“Ahora vamos a ver con ambos ojos… avisame cuando estés listo”*; el paciente confirma continuidad (`listo`, `ok`, etc.); el agente envía **solo** `respuestaPaciente` (sin `interpretacionComparacion`).
+- **Comparaciones (esférica → cilíndrica opcional):** en cada ronda el backend aplica la **variante** (0,50 D hacia el cero) y emite un **único** `hablar` que concatena el aviso de *otro par* y la pregunta *anterior / actual*; en ese turno el paciente ya viste con la variante puesta, alineado con el protocolo. Las respuestas se envían con `interpretacionComparacion`.
+- **Resultado:** `resultados.R.binocular` y `resultados.L.binocular` como `{ esfera, cilindro, angulo }` por ojo. Modo prueba: `testbin` usa `valoresRecalculados` completo; ver `examenprueba.md`.
+- **Agente:** `src/app/agentConfigs/chatSupervisor/index.ts` — reglas de payload por mensaje (transición “listo” vs pregunta comparativa); ver instrucciones en el propio archivo.
 
 ### Frontend (`src/app/`)
 
@@ -175,14 +194,16 @@ Configuración del agente AI conversacional.
 #### **ETAPA_3: Preparación y Secuencia**
 **Estado:** ✅ Implementado
 
-- Genera secuencia completa del examen basada en valores recalculados
-- Determina qué tests incluir según el valor del cilindro:
+- Genera la secuencia del examen según `modo`:
+  - `normal` → secuencia completa (`generarSecuenciaExamen`)
+  - modos de prueba → subconjunto (`generarSecuenciaPrueba`) — ver `examenprueba.md`
+- En modo normal, determina qué tests de cilindro incluir según el valor del cilindro recalculado:
   - Cilindro = 0 o -0.25 → No incluir tests de cilindro
   - Cilindro entre -0.50 y -1.75 → Incluir test de cilindro, NO de ángulo
   - Cilindro entre -2.00 y -6.00 → Incluir ambos tests (cilindro y ángulo)
 - Configura foróptero inicial (R abierto, L cerrado)
-- Inicializa `testActual` con el primer test (agudeza_inicial R)
-- Transición a ETAPA_4
+- Inicializa `testActual` con el primer test de la secuencia
+- **Transición de etapa:** `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)` (no forzar siempre ETAPA_4; el primer test puede ser lentes o binocular en modos de prueba)
 
 #### **ETAPA_4: Test de Agudeza Visual**
 **Estado:** ✅ Implementado completamente
@@ -212,14 +233,13 @@ Configuración del agente AI conversacional.
 2. Configura foróptero con valores finales optimizados (esfera fino + cilindro + ángulo)
 3. Si respuesta correcta:
    - Si es el mismo logMAR que el último correcto → incrementar confirmaciones
-   - Si hay 2 confirmaciones y está en 0.0 → guardar y terminar
-   - Si hay 2 confirmaciones y NO está en 0.0 → bajar al siguiente logMAR más pequeño
-   - Si es nuevo logMAR → incrementar confirmaciones
+   - Si hay 2 confirmaciones → resultado confirmado y fin del test
+   - Si es nuevo logMAR → establecer confirmaciones en 1 y bajar logMAR (si es posible)
 4. Si respuesta incorrecta:
-   - Volver al logMAR anterior donde sí veía
-   - Confirmar 2 veces en ese logMAR
+   - Volver al último logMAR correcto
+   - Si no hay último correcto → subir logMAR
 5. Generar nueva letra Sloan diferente
-6. **Navegación solo hacia abajo:** 0.4 → 0.3 → 0.2 → 0.1 → 0.0 (nunca sube más allá de `agudeza_inicial`)
+6. Misma lógica de confirmación de `agudeza_inicial`; la única diferencia es el valor de inicio
 
 **Cambio de Ojo (agudeza_inicial):**
 - Al completar `agudeza_alcanzada` R y pasar a `agudeza_inicial` L:
@@ -247,7 +267,8 @@ Configuración del agente AI conversacional.
    - Estrategia de 3 valores (base, +0.25, -0.25)
    - Sistema de confirmación con 2 confirmaciones (corregido: incrementa correctamente, no resetea)
    - Transición automática desde esférico grueso sin mencionar el test al paciente
-   - Sin mensaje introductorio (parte del flujo continuo de comparación de lentes)
+   - Sin mensaje introductorio específico del test (parte del flujo continuo de comparación de lentes)
+   - **Garantía conversacional ETAPA_5:** aunque no haya introducción, el backend siempre retorna al menos un paso `hablar` con la pregunta de comparación
    - Guardado de resultados en `resultados[ojo].esfericoFino`
    - Probado y funcionando correctamente
    - **Bug corregido (2025-01-27):** Sistema de confirmación ahora incrementa correctamente las confirmaciones en lugar de resetearlas, evitando comparaciones duplicadas (ej: 0.75 vs 0.75)
@@ -274,7 +295,7 @@ Configuración del agente AI conversacional.
    - Espera del estado del foróptero antes de mostrar letras
    - Guardado de resultados en `resultados[ojo].cilindricoAngulo`
    - Actualización automática del foróptero después de confirmar (actualiza ángulo con esfera y cilindro finales)
-   - Sin mensaje introductorio (parte del flujo continuo de comparación de lentes)
+   - Sin mensaje introductorio específico del test (parte del flujo continuo de comparación de lentes)
    - Probado y funcionando correctamente
 
 **Algoritmo de Comparación (Esférico Grueso, Fino, Cilíndrico y Cilíndrico Ángulo):**
@@ -338,7 +359,7 @@ Configuración del agente AI conversacional.
 12. ✅ Agudeza visual alcanzada
 
 **Binocular:**
-13. ❌ Binocular *(opcional - no implementado)*
+13. ✅ Binocular (ETAPA_6; tras agudeza alcanzada L)
 
 ### Determinación de Tests Opcionales
 
@@ -380,6 +401,11 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
    ↓
 5. Agente: Habla al paciente
 ```
+
+**Regla de contrato (ETAPA_5):**
+- En `ETAPA_5` la respuesta del backend siempre incluye al menos un paso `hablar`.
+- Mensaje estándar de comparación: `Ves mejor con este o con el anterior?`.
+- Esto aplica también en transiciones internas del mismo stage (ej: `esferico_grueso` → `esferico_fino`).
 
 ### Tipos de Pasos
 
@@ -557,8 +583,9 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
    - ❌ Mensaje final del examen
    - ❌ Resumen de resultados
 
-4. **Binocular**
-   - ❌ Test binocular (opcional, no priorizado)
+4. **Binocular (ETAPA_6)**
+   - ✅ Test binocular en secuencia normal y modo `testbin` (ver `DEFINICIONES_EXAMEN_BINOCULAR.md` y `PLAN_IMPLEMENTACION_EXAMEN_BINOCULAR.md`)
+   - Transición con ambos ojos + “listo”; comparaciones con mensaje único post-variante
 
 ---
 
@@ -581,8 +608,28 @@ curl https://foroptero-production.up.railway.app/api/examen/estado
 # Consultar detalle completo
 curl https://foroptero-production.up.railway.app/api/examen/detalle
 
-# Reiniciar examen
+# Reiniciar examen en modo normal (default)
 curl -X POST https://foroptero-production.up.railway.app/api/examen/reiniciar
+
+# Reiniciar examen en modo prueba de agudeza
+curl -X POST https://foroptero-production.up.railway.app/api/examen/reiniciar \
+  -H "Content-Type: application/json" \
+  -d '{"modo":"testag"}'
+
+# Reiniciar examen en modo prueba de esféricos
+curl -X POST https://foroptero-production.up.railway.app/api/examen/reiniciar \
+  -H "Content-Type: application/json" \
+  -d '{"modo":"testesf"}'
+
+# Reiniciar examen en modo prueba cilíndrico
+curl -X POST https://foroptero-production.up.railway.app/api/examen/reiniciar \
+  -H "Content-Type: application/json" \
+  -d '{"modo":"testcil"}'
+
+# Reiniciar examen en modo prueba binocular
+curl -X POST https://foroptero-production.up.railway.app/api/examen/reiniciar \
+  -H "Content-Type: application/json" \
+  -d '{"modo":"testbin"}'
 ```
 
 ### Endpoints de Control Web
@@ -611,6 +658,7 @@ curl https://foroptero-production.up.railway.app/api/pantalla
 
 ### Archivos de Documentación
 
+- `reference/foroptero-server/examenprueba.md` - Modo de examen de prueba (API, motor, agente, panel Framer)
 - `reference/ARQUITECTURA_ENDPOINTS.md` - Arquitectura de endpoints y ejecución automática
 - `reference/FASE1_IMPLEMENTACION_COMPLETA.md` - Implementación de ejecución automática
 - `reference/FASE2_IMPLEMENTACION_COMPLETA.md` - Simplificación del agente
@@ -622,6 +670,7 @@ curl https://foroptero-production.up.railway.app/api/pantalla
 
 - `reference/foroptero-server/server.js` - Servidor Express + MQTT
 - `reference/foroptero-server/motorExamen.js` - Motor de examen visual
+- `reference_framer/ForopteroControl.tsx` - Panel de control de referencia (reinicio y modos de prueba)
 - `src/app/agentConfigs/chatSupervisor/index.ts` - Configuración del agente AI
 
 ---
@@ -658,8 +707,13 @@ curl https://foroptero-production.up.railway.app/api/pantalla
 - **Bug Fix (2025-01-27):** Corrección de cambio de ojo en `agudeza_inicial` - Al pasar de `agudeza_alcanzada` R a `agudeza_inicial` L, ahora detecta correctamente el cambio de ojo usando el test anterior de la secuencia (en lugar del estado reseteado) y configura automáticamente el foróptero con valores recalculados, cambia la oclusión (R: close, L: open) y espera a que el foróptero esté ready antes de mostrar TV
 - **Bug Fix (2025-01-27):** Corrección de agudeza alcanzada saltada - El sistema saltaba el test de `agudeza_alcanzada` después de completar tests de lentes. Solución implementada en 3 partes: (1) Mejora de condición de inicialización para distinguir entre tipos de test cuando es el mismo ojo, (2) Verificación de tipo de test específico en confirmación (no solo si hay algún test confirmado), (3) Reset del estado de agudeza al avanzar de lentes a agudeza. Ahora `agudeza_alcanzada` se ejecuta correctamente después de todos los tests de lentes.
 - **Feature (2025-01-27):** Implementación completa de `agudeza_alcanzada` - Test de agudeza visual alcanzada implementado completamente con navegación progresiva solo hacia abajo, configuración de foróptero con valores finales optimizados, y sistema de confirmación doble. Funciona correctamente para ambos ojos (R y L).
+- **Feature (2026-03-13):** Modo de examen de prueba — `estadoExamen.modo`, `generarSecuenciaPrueba`, activación vía `POST /api/examen/reiniciar` con body `{ "modo": ... }`, campo `modo` en `GET /api/examen/detalle`. ETAPA_1 ya no activa modo por texto del paciente.
+- **Bug Fix (2026-03-13):** ETAPA_3 — `estadoExamen.etapa` y `contexto.etapa` en la respuesta de instrucciones ahora se derivan del primer `testActual` con `mapearTipoTestAEtapa`, corrigiendo modos `testesf`, `testcil` y `testbin` donde el agente enviaba `interpretacionAgudeza` por error (etapa reportada como ETAPA_4 con test de lentes/binocular).
+- **Feature (2026-03-13):** Panel `reference_framer/ForopteroControl.tsx` — botones de reinicio normal y modos de prueba; muestra `modo` desde detalle del examen.
+- **Bug Fix (2026-03-24):** `agudeza_alcanzada` ahora usa la misma lógica de confirmación y cierre que `agudeza_inicial` (2 confirmaciones cierran resultado en cualquier logMAR). Se mantiene como única diferencia que inicia en `resultados[ojo].agudezaInicial`.
+- **Feature (2026-04-22):** **ETAPA_6 (binocular)** — transición con mensaje *ambos ojos + listo*; comparaciones esférica y, si aplica, cilíndrica con variante ya aplicada antes del `hablar` (mensaje combinado: aviso de otro par + pregunta *anterior/actual*). Ajuste del agente para `interpretacionComparacion` solo en la pregunta comparativa, no en “listo”. Especificación en `reference/foroptero-server/DEFINICIONES_EXAMEN_BINOCULAR.md`.
 
 ---
 
-**Última actualización:** 2025-01-27  
-**Estado:** Implementación casi completa - Todos los tests de lentes completados (esférico grueso, fino, cilíndrico y cilíndrico ángulo). Agudeza alcanzada implementada y corregida. Recálculo esférico implementado. Cambio de ojo en `agudeza_inicial` corregido. Pendiente: finalización y refinamientos
+**Última actualización:** 2026-04-22  
+**Estado:** Examen con ETAPA_6 binocular operativa en motor y agente; modos de prueba vía API; documentación de binocular alineada al flujo clínico validado.

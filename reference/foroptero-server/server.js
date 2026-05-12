@@ -361,7 +361,22 @@ app.get("/api/examen/detalle", (req, res) => {
 // POST /api/examen/reiniciar - Reiniciar examen (vuelve a etapa 1)
 app.post("/api/examen/reiniciar", (req, res) => {
   try {
-    const estado = inicializarExamen();
+    const modosPermitidos = ['normal', 'testag', 'testesf', 'testcil', 'testbin'];
+    const modoSolicitado = req.body?.modo;
+    const modoFinal = modoSolicitado ?? 'normal';
+
+    if (!modosPermitidos.includes(modoFinal)) {
+      return res.status(400).json({
+        ok: false,
+        error: `Modo inválido. Debe ser uno de: ${modosPermitidos.join(', ')}`
+      });
+    }
+
+    const estado = inicializarExamen(modoFinal);
+    const mensajeModo = modoFinal === 'normal'
+      ? 'Perfecto, vamos a reiniciar el examen.'
+      : `Perfecto, reiniciamos en modo de prueba ${modoFinal}.`;
+
     res.json({
       ok: true,
       mensaje: "Examen reiniciado",
@@ -370,7 +385,7 @@ app.post("/api/examen/reiniciar", (req, res) => {
         {
           tipo: 'hablar',
           orden: 1,
-          mensaje: 'Perfecto, vamos a reiniciar el examen. Escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0'
+          mensaje: `${mensajeModo} Escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0`
         }
       ]
     });

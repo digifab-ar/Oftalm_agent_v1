@@ -13,23 +13,13 @@ Este proyecto implementa un sistema de examen visual oftalmológico automatizado
 - **Agente AI:** Conversa con el paciente e interpreta respuestas
 - **Dispositivos:** Foróptero digital (ESP32) y pantalla/TV para mostrar letras Sloan
 
-### Estado Actual
 
-✅ **Implementado:**
-- ETAPA_1: Recolección de valores iniciales del autorefractómetro
-- ETAPA_2: Recálculo cilíndrico según protocolo clínico
-- ETAPA_3: Generación de secuencia del examen y preparación
-- ETAPA_4: Test de agudeza visual inicial (parcial)
-
-❌ **Falta Implementar:**
-- ETAPA_5: Tests de lentes (esférico grueso, esférico fino, cilíndrico, cilíndrico ángulo)
-- Agudeza alcanzada (después de todos los tests de lentes)
-- Finalización del examen
 
 ## 📚 Documentación
 
 Para documentación completa del sistema, ver:
 - **[DOCUMENTACION.md](./DOCUMENTACION.md)** - Documentación completa del sistema
+- **[reference/foroptero-server/examenprueba.md](./reference/foroptero-server/examenprueba.md)** - Modo de examen de prueba (API `reiniciar`, motor, agente, panel Framer)
 - **[reference/foroptero-server/README.md](./reference/foroptero-server/README.md)** - Documentación del backend
 
 ## 🚀 Inicio Rápido

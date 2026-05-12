@@ -28,6 +28,7 @@ export function ForopteroControl() {
     const [resultados, setResultados] = useState<any>(null)
     const [estadoActual, setEstadoActual] = useState<any>(null)
     const [timestamps, setTimestamps] = useState<any>(null)
+    const [modoExamen, setModoExamen] = useState("normal")
 
     // Polling cada 1.5 segundos
     useEffect(() => {
@@ -75,6 +76,7 @@ export function ForopteroControl() {
                 if (!active) return
 
                 if (data.ok && data.detalle) {
+                    setModoExamen(data.detalle.modo || "normal")
                     setValoresIniciales(data.detalle.valoresIniciales || null)
                     setValoresRecalculados(
                         data.detalle.valoresRecalculados || null
@@ -120,9 +122,16 @@ export function ForopteroControl() {
         return `${nombre} (${ojo})`
     }
 
+    const formatoRxBinocular = (lente: any) => {
+        if (!lente || typeof lente !== "object") return formatoValor(lente)
+        const { esfera, cilindro, angulo } = lente
+        if (esfera == null) return "N/A"
+        return `Esf ${Number(esfera).toFixed(2)} / Cil ${cilindro != null ? Number(cilindro).toFixed(2) : "—"} @ ${angulo ?? 0}°`
+    }
+
     const formatearValorTest = (test: any) => {
         if (test.tipo === "binocular") {
-            return `R: ${formatoValor(test.resultadoR)} / L: ${formatoValor(test.resultadoL)}`
+            return `R: ${formatoRxBinocular(test.resultadoR)} / L: ${formatoRxBinocular(test.resultadoL)}`
         }
         return formatoValor(test.resultado)
     }
@@ -164,15 +173,27 @@ export function ForopteroControl() {
         }
     }
 
-    async function reiniciarExamen() {
+    async function reiniciarExamen(modo = "normal") {
         try {
-            await fetch(
+            setStatus(`Reiniciando examen en modo ${modo}...`)
+            const res = await fetch(
                 "https://foroptero-production.up.railway.app/api/examen/reiniciar",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ modo }),
                 }
             )
+
+            const data = await res.json()
+            if (!res.ok || !data?.ok) {
+                setStatus(
+                    `⚠️ Error reiniciando examen: ${data?.error || "Error desconocido"}`
+                )
+                return
+            }
+
+            setStatus(`Examen reiniciado en modo ${modo}`)
         } catch {
             setStatus("⚠️ Error reiniciando examen")
         }
@@ -476,9 +497,53 @@ export function ForopteroControl() {
                                 background: "#444",
                                 color: "#fff",
                             }}
-                            onClick={reiniciarExamen}
+                            onClick={() => reiniciarExamen("normal")}
                         >
                             Nuevo examen
+                        </button>
+
+                        <button
+                            style={{
+                                ...bigBtn,
+                                background: "#2563eb",
+                                color: "#fff",
+                            }}
+                            onClick={() => reiniciarExamen("testag")}
+                        >
+                            Prueba AG
+                        </button>
+
+                        <button
+                            style={{
+                                ...bigBtn,
+                                background: "#7c3aed",
+                                color: "#fff",
+                            }}
+                            onClick={() => reiniciarExamen("testesf")}
+                        >
+                            Prueba ESF
+                        </button>
+
+                        <button
+                            style={{
+                                ...bigBtn,
+                                background: "#9333ea",
+                                color: "#fff",
+                            }}
+                            onClick={() => reiniciarExamen("testcil")}
+                        >
+                            Prueba CIL
+                        </button>
+
+                        <button
+                            style={{
+                                ...bigBtn,
+                                background: "#0d9488",
+                                color: "#fff",
+                            }}
+                            onClick={() => reiniciarExamen("testbin")}
+                        >
+                            Prueba BIN
                         </button>
                     </div>
                 </div>
@@ -589,6 +654,9 @@ export function ForopteroControl() {
                             </div>
                             {estadoActual && (
                                 <div style={{ marginBottom: 10, fontSize: 13 }}>
+                                    <div>
+                                        <strong>Modo:</strong> {modoExamen || "normal"}
+                                    </div>
                                     <div>
                                         <strong>Etapa:</strong>{" "}
                                         {estadoActual.testActual?.tipo || "N/A"}

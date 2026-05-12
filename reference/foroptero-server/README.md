@@ -91,6 +91,8 @@ Inicializa un nuevo examen visual.
 ### POST /api/examen/instrucciones
 Obtiene los pasos que el agente debe ejecutar.
 
+**Garantía ETAPA_5:** en tests de lentes (`ETAPA_5`), el backend siempre devuelve al menos un paso `hablar` con la pregunta de comparación (`Ves mejor con este o con el anterior?`), incluso en transiciones internas como `esferico_grueso` → `esferico_fino`.
+
 **Request:**
 ```json
 {
@@ -131,6 +133,14 @@ Obtiene el estado actual del examen.
 ### POST /api/examen/reiniciar
 Reinicia el examen desde el principio.
 
+**Body opcional (JSON):**
+```json
+{ "modo": "normal" }
+```
+Valores permitidos para `modo`: `normal`, `testag`, `testesf`, `testcil`, `testbin`. Si se omite el body o el campo `modo`, equivale a `normal`. Modo inválido → `400`.
+
+Documentación ampliada: [examenprueba.md](./examenprueba.md).
+
 **Response:**
 ```json
 {
@@ -155,6 +165,7 @@ Obtiene el detalle completo del examen, incluyendo valores iniciales, recalculad
 {
   "ok": true,
   "detalle": {
+    "modo": "normal",
     "valoresIniciales": {
       "R": { "esfera": 0.75, "cilindro": -1.75, "angulo": 60 },
       "L": { "esfera": 2.75, "cilindro": 0.00, "angulo": 0 }
@@ -217,6 +228,8 @@ El backend ejecuta automáticamente todos los comandos de dispositivos (forópte
 3. Backend retorna solo pasos de tipo "hablar" al agente
 4. Agente habla al paciente usando el mensaje exacto
 
+**Nota ETAPA_5:** nunca retorna `pasos` vacío; siempre incluye una pregunta de comparación para mantener el flujo conversacional del agente.
+
 **Tipos de pasos:**
 - `foroptero` - Ejecutado automáticamente por el backend
 - `tv` - Ejecutado automáticamente por el backend
@@ -235,11 +248,12 @@ El archivo `motorExamen.js` contiene la lógica completa del examen visual imple
   - Recálculo esférico: valores negativos se mantienen igual, valores positivos según rangos específicos
   - Recálculo cilíndrico: aplica ajustes según rangos de valores
 - `ETAPA_3` - Generación de secuencia y preparación
-- `ETAPA_4` - Test de agudeza visual inicial
+- `ETAPA_4` - Tests de agudeza visual (inicial y alcanzada por ojo)
 - `ETAPA_5` - Tests de lentes (esférico grueso, fino, cilíndrico, cilíndrico ángulo)
+- `ETAPA_6` - Examen binocular (ajuste final con ambos ojos; ver `DEFINICIONES_EXAMEN_BINOCULAR.md`)
 - `FINALIZADO` - Examen completado
 
-**Estado actual:** ETAPA_2 completamente implementada (recálculo esférico y cilíndrico). ETAPA_4 parcialmente implementada (agudeza inicial completa, falta agudeza alcanzada). ETAPA_5 completamente implementada (todos los tests de lentes).
+**Estado actual:** ETAPA_2 implementada (recálculo esférico y cilíndrico). ETAPA_4 implementada (agudeza inicial y agudeza alcanzada). ETAPA_5 implementada (todos los tests de lentes). **ETAPA_6** implementada (binocular: transición *listo*, comparaciones esférica/cilíndrica con variante aplicada antes del mensaje al paciente).
 
 ## Notas
 
