@@ -123,6 +123,13 @@ let estadoExamen = {
   
   // Respuesta pendiente del paciente (para procesamiento)
   respuestaPendiente: null,
+
+  /**
+   * Tras agudeza_alcanzada de un ojo, antes del primer esferico_grueso del otro:
+   * foróptero + TV + mensaje "avisame listo"; hasta recibir listo no arranca la comparación.
+   * null | { ojo: 'R'|'L', fase: 'esperando_listo' | 'hecha' }
+   */
+  esperaListoCambioOjo: null,
   
   // Secuencia del examen
   secuenciaExamen: {
@@ -234,6 +241,7 @@ export function inicializarExamen(modo = 'normal') {
       omitirCilindro: false
     },
     respuestaPendiente: null,
+    esperaListoCambioOjo: null,
     secuenciaExamen: {
       testsActivos: [],
       indiceActual: 0,
@@ -864,6 +872,40 @@ function calcularValoresFinalesForoptero(ojo) {
 /** logMAR por defecto antes de lentes y en agudeza_alcanzada (baseline operativa, no medición). */
 const LOGMAR_ARRANQUE_LENTES = 0.3;
 
+const MSG_ADAPTACION_CAMBIO_OJO = {
+  L: 'Ahora vamos con el ojo izquierdo. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.',
+  R: 'Ahora vamos con el ojo derecho. Esperemos a que se terminen de ajustar los lentes y avisame cuando estés listo.'
+};
+
+/**
+ * Tras agudeza alcanzada en un ojo, el primer esferico_grueso del otro ojo requiere adaptación + "listo".
+ */
+function necesitaAdaptacionTrasAgudezaOtroOjo(testActual) {
+  if (!testActual || testActual.tipo !== 'esferico_grueso') return false;
+  const idx = estadoExamen.secuenciaExamen.indiceActual;
+  if (idx < 1) return false;
+  const prev = estadoExamen.secuenciaExamen.testsActivos[idx - 1];
+  if (!prev || prev.tipo !== 'agudeza_alcanzada') return false;
+  return prev.ojo !== testActual.ojo;
+}
+
+/** Misma heurística que continuidad binocular ("listo", "dale", etc.). */
+function esRespuestaListoAdaptacionOjo(respuestaPaciente = '') {
+  const t = String(respuestaPaciente || '').toLowerCase().trim();
+  if (!t) return false;
+  const patrones = [
+    /\blisto\b/,
+    /\bcontinu(ar|emos)?\b/,
+    /\bok\b/,
+    /\bdale\b/,
+    /\bya\b/,
+    /\bseguimos\b/,
+    /\bsi\b/,
+    /\bs[ií]\b/
+  ];
+  return patrones.some((re) => re.test(t));
+}
+
 /**
  * Fija baseline de agudeza por ojo antes del primer esferico_grueso (plan etapa 1).
  * @param {'R'|'L'} ojo
@@ -1421,7 +1463,7 @@ function generarPasosEtapa3() {
       {
         tipo: 'hablar',
         orden: 3,
-        mensaje: 'Vamos a empezar con el ojo rerecho, esperemos a que se termine de mover los lentes.'
+        mensaje: 'Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes.'
       }
     ],
     contexto: {
@@ -1532,6 +1574,46 @@ async function ejecutarPasosAutomaticamente(pasos) {
 export async function obtenerInstrucciones(respuestaPaciente = null, interpretacionAgudeza = null, interpretacionComparacion = null) {
   // Si hay respuesta del paciente, procesarla primero
   if (respuestaPaciente) {
+    const testActualRef = estadoExamen.secuenciaExamen.testActual;
+    // ETAPA_5 — tras agudeza del otro ojo: esperar "listo" antes de la primera comparación
+    if (
+      estadoExamen.etapa === 'ETAPA_5' &&
+      estadoExamen.esperaListoCambioOjo?.fase === 'esperando_listo' &&
+      testActualRef &&
+      necesitaAdaptacionTrasAgudezaOtroOjo(testActualRef)
+    ) {
+      if (esRespuestaListoAdaptacionOjo(respuestaPaciente)) {
+        estadoExamen.esperaListoCambioOjo = { ojo: testActualRef.ojo, fase: 'hecha' };
+        const pasos = generarPasosEtapa5();
+        await ejecutarPasosAutomaticamente(pasos.pasos || []);
+        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
+        return {
+          ok: true,
+          pasos: pasosParaAgente,
+          contexto: pasos.contexto || {
+            etapa: estadoExamen.etapa,
+            testActual: estadoExamen.secuenciaExamen.testActual
+          }
+        };
+      }
+      return {
+        ok: true,
+        pasos: [
+          {
+            tipo: 'hablar',
+            orden: 1,
+            mensaje: 'Cuando estés listo para seguir, avisame con un "listo" o "dale".'
+          }
+        ],
+        contexto: {
+          etapa: 'ETAPA_5',
+          testActual: estadoExamen.secuenciaExamen.testActual,
+          esperaListoCambioOjo: true,
+          adaptacionCambioOjo: true
+        }
+      };
+    }
+
     // Si estamos en ETAPA_5 y hay interpretación de comparación, procesarla
     if (estadoExamen.etapa === 'ETAPA_5' && interpretacionComparacion) {
       const resultado = procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionComparacion);
@@ -2266,7 +2348,78 @@ function generarPasosEtapa5() {
   const ojo = testActual.ojo;
   const tipo = testActual.tipo;
   const comparacion = estadoExamen.comparacionActual;
-  
+  const adaptNecesaria = necesitaAdaptacionTrasAgudezaOtroOjo(testActual);
+  const esp = estadoExamen.esperaListoCambioOjo;
+
+  if (!adaptNecesaria && estadoExamen.esperaListoCambioOjo) {
+    estadoExamen.esperaListoCambioOjo = null;
+  }
+
+  if (adaptNecesaria && esp?.fase !== 'hecha') {
+    if (!esp || esp.ojo !== ojo) {
+      estadoExamen.esperaListoCambioOjo = { ojo, fase: 'esperando_listo' };
+      const vr = estadoExamen.valoresRecalculados[ojo];
+      const otro = ojo === 'R' ? 'L' : 'R';
+      const pasosAdaptacion = [
+        {
+          tipo: 'foroptero',
+          orden: 1,
+          foroptero: {
+            [ojo]: {
+              esfera: vr.esfera,
+              cilindro: vr.cilindro,
+              angulo: vr.angulo,
+              occlusion: 'open'
+            },
+            [otro]: {
+              occlusion: 'close'
+            }
+          }
+        },
+        { tipo: 'esperar_foroptero', orden: 2 },
+        {
+          tipo: 'tv',
+          orden: 3,
+          letra: 'H',
+          logmar: LOGMAR_ARRANQUE_LENTES
+        },
+        {
+          tipo: 'hablar',
+          orden: 4,
+          mensaje: MSG_ADAPTACION_CAMBIO_OJO[ojo]
+        }
+      ];
+      return {
+        ok: true,
+        pasos: pasosAdaptacion,
+        contexto: {
+          etapa: 'ETAPA_5',
+          testActual,
+          esperaListoCambioOjo: true,
+          adaptacionCambioOjo: true
+        }
+      };
+    }
+    if (esp.fase === 'esperando_listo') {
+      return {
+        ok: true,
+        pasos: [
+          {
+            tipo: 'hablar',
+            orden: 1,
+            mensaje: MSG_ADAPTACION_CAMBIO_OJO[ojo]
+          }
+        ],
+        contexto: {
+          etapa: 'ETAPA_5',
+          testActual,
+          esperaListoCambioOjo: true,
+          adaptacionCambioOjo: true
+        }
+      };
+    }
+  }
+
   // Si no hay comparación iniciada o es un tipo diferente, inicializarla
   if (!comparacion.tipo || comparacion.ojo !== ojo || comparacion.tipo !== tipo) {
     let valorBase;
