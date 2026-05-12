@@ -137,7 +137,7 @@ Reinicia el examen desde el principio.
 ```json
 { "modo": "normal" }
 ```
-Valores permitidos para `modo`: `normal`, `testag`, `testesf`, `testcil`, `testbin`. Si se omite el body o el campo `modo`, equivale a `normal`. Modo inválido → `400`.
+Valores permitidos para `modo`: `normal`, `testesf`, `testcil`, `testbin`. Si se omite el body o el campo `modo`, equivale a `normal`. Modo inválido → `400`.
 
 Documentación ampliada: [examenprueba.md](./examenprueba.md).
 
@@ -177,7 +177,7 @@ Obtiene el detalle completo del examen, incluyendo valores iniciales, recalculad
     "tests": [
       {
         "indice": 0,
-        "tipo": "agudeza_inicial",
+        "tipo": "esferico_grueso",
         "ojo": "R",
         "estado": "en_curso",
         "resultado": null
@@ -195,9 +195,9 @@ Obtiene el detalle completo del examen, incluyendo valores iniciales, recalculad
       "L": { ... }
     },
     "estadoActual": {
-      "etapa": "ETAPA_4",
+      "etapa": "ETAPA_5",
       "ojoActual": "R",
-      "testActual": { "tipo": "agudeza_inicial", "ojo": "R" },
+      "testActual": { "tipo": "esferico_grueso", "ojo": "R" },
       "indiceActual": 0,
       "progreso": 50
     },

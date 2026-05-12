@@ -277,7 +277,7 @@ curl https://foroptero-production.up.railway.app/api/estado
 # Test POST /api/pantalla
 curl -X POST https://foroptero-production.up.railway.app/api/pantalla \
   -H "Content-Type: application/json" \
-  -d '{"dispositivo":"pantalla","accion":"mostrar","letra":"H","logmar":0.4}'
+  -d '{"dispositivo":"pantalla","accion":"mostrar","letra":"H","logmar":0.3}'
 
 # Test GET /api/pantalla
 curl https://foroptero-production.up.railway.app/api/pantalla

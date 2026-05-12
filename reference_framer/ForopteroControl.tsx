@@ -111,7 +111,6 @@ export function ForopteroControl() {
 
     const formatearNombreTest = (tipo: string, ojo: string) => {
         const nombres: { [key: string]: string } = {
-            agudeza_inicial: "Agudeza Inicial",
             esferico_grueso: "Esférico Grueso",
             esferico_fino: "Esférico Fino",
             cilindrico: "Cilíndrico",
@@ -500,17 +499,6 @@ export function ForopteroControl() {
                             onClick={() => reiniciarExamen("normal")}
                         >
                             Nuevo examen
-                        </button>
-
-                        <button
-                            style={{
-                                ...bigBtn,
-                                background: "#2563eb",
-                                color: "#fff",
-                            }}
-                            onClick={() => reiniciarExamen("testag")}
-                        >
-                            Prueba AG
                         </button>
 
                         <button

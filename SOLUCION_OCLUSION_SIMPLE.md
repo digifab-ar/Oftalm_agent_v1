@@ -13,7 +13,7 @@ Según los logs y el código:
 
 **Regla:** La oclusión solo cambia en 3 situaciones:
 1. Al setear foróptero con valores recalculados para R (inicio)
-2. Al pasar de R a L (agudeza_alcanzada R → agudeza_inicial L)
+2. Al pasar de R a L (p. ej. `agudeza_alcanzada (R)` → primer test del ojo izquierdo, hoy `esferico_grueso (L)`)
 3. Al pasar de L a Binocular (agudeza_alcanzada L → binocular)
 
 ## Solución Simple y Elegante
@@ -53,8 +53,7 @@ const cambioDeTipoTest = testAnterior !== null &&
                           testAnterior.tipo === 'esferico_fino' || 
                           testAnterior.tipo === 'cilindrico' || 
                           testAnterior.tipo === 'cilindrico_angulo') &&
-                         (testActual.tipo === 'agudeza_inicial' || 
-                          testActual.tipo === 'agudeza_alcanzada') &&
+                         testActual.tipo === 'agudeza_alcanzada' &&
                          testAnterior.ojo === ojo; // Mismo ojo
 
 // Si cambió el tipo de test pero no el ojo, configurar foróptero SIN cambiar oclusión

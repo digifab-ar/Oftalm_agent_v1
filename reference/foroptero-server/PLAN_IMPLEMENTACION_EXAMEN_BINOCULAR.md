@@ -59,7 +59,7 @@ Campos sugeridos (ajustar nombres al estilo del archivo):
 | 3.3 | Tras confirmación "listo": iniciar secuencia esférica normal (mensaje previo de cambio -> variante -> pregunta); transiciones de `fase` coherentes con `obtenerInstrucciones` (que filtra solo `hablar` al agente). |
 | 3.4 | Si `omitirCilindro`: tras resolver esfera, saltar a confirmación final y `confirmarResultadoBinocular`. |
 | 3.5 | Secuencia cilíndrica análoga con `rxActiva` post-esfera. |
-| 3.6 | TV: letra `H`, `logmar: 0.4` siempre. |
+| 3.6 | TV: letra `H`, `logmar: 0.3` siempre. |
 | 3.7 | Foróptero: ambos ojos `occlusion: 'open'`, cil/eje según snapshots. |
 
 **Contrato:** cuando `fase === esperando_respuesta`, devolver `pasos: []` y `contexto` rico (`paso`, `fase`, quizá resumen numérico) para debugging.

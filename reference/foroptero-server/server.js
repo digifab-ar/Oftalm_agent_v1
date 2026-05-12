@@ -361,7 +361,7 @@ app.get("/api/examen/detalle", (req, res) => {
 // POST /api/examen/reiniciar - Reiniciar examen (vuelve a etapa 1)
 app.post("/api/examen/reiniciar", (req, res) => {
   try {
-    const modosPermitidos = ['normal', 'testag', 'testesf', 'testcil', 'testbin'];
+    const modosPermitidos = ['normal', 'testesf', 'testcil', 'testbin'];
     const modoSolicitado = req.body?.modo;
     const modoFinal = modoSolicitado ?? 'normal';
 

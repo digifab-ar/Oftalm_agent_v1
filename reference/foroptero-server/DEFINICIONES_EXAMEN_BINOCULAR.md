@@ -32,7 +32,7 @@ En cada paso el paciente indica si ve **mejor con la configuración anterior o c
 Al terminar `agudeza_alcanzada (L)` y antes de iniciar la primera comparación binocular, se agrega un subpaso de adaptación:
 
 1. Aplicar foróptero con la **línea base binocular** (según §2.1 o §2.2), con **ambos ojos abiertos**.
-2. Mostrar en TV: **H @ logMAR 0,4**.
+2. Mostrar en TV: **H @ logMAR 0,3**.
 3. Mensaje obligatorio al paciente:
 
 > «Ahora vamos a ver con ambos ojos, tomate tu tiempo y avisame cuando estés listo.»
@@ -105,7 +105,7 @@ Nota de transición (§2.3): durante el mensaje de “avisame cuando estés list
 ## 9. Presentación visual (TV)
 
 - **Letra:** siempre **H**.
-- **logMAR:** siempre **0,4**.
+- **logMAR:** siempre **0,3**.
 
 ---
 
@@ -137,7 +137,7 @@ Mensaje de transición obligatorio (una sola vez al entrar a ETAPA_6 desde `agud
 
 1. Aplicar foróptero con **base binocular inicial** (ambos ojos `open`).
 2. Esperar ready del foróptero.
-3. **TV:** H @ logMAR 0,4.
+3. **TV:** H @ logMAR 0,3.
 4. **Hablar:** mensaje de transición (“...avisame cuando estés listo”).
 5. Esperar confirmación de continuidad del paciente.
 
@@ -147,7 +147,7 @@ Para cada comparación (esférico; luego cilíndrico si aplica), el flujo observ
 
 1. Aplicar **foróptero** con la **variante** del paso (0,50 hacia el cero, reglas §3–§5; ambos ojos abiertos).
 2. Esperar ready del foróptero.
-3. **TV:** H @ logMAR 0,4.
+3. **TV:** H @ logMAR 0,3.
 4. **Hablar:** mensaje combinado §11 (aviso + pregunta comparativa en un solo turno).
 5. Esperar respuesta e interpretación; actualizar configuración activa y continuar.
 
@@ -165,4 +165,4 @@ La **configuración anterior** a la que se refiere la pregunta es la base del pa
 
 ---
 
-*Implementación en `motorExamen.js` (ETAPA_6). Última actualización: 2026-04-22 — transición “listo”; comparaciones con variante aplicada antes del único `hablar` por ronda (mensaje combinado); documentación alineada en `DOCUMENTACION.md` y `PLAN_IMPLEMENTACION_EXAMEN_BINOCULAR.md` (estado implementado).*
+*Implementación en `motorExamen.js` (ETAPA_6). Última actualización: 2026-05-12 — logMAR TV binocular 0,3; sin test `agudeza_inicial` en secuencia normal (baseline `agudezaInicial` 0,3 al primer `esferico_grueso` por ojo).*

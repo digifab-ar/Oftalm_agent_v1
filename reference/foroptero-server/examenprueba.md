@@ -2,7 +2,7 @@
 
 Este documento describe la implementación del **modo de examen de prueba** en el motor de examen visual (`motorExamen.js`) y su integración con los endpoints HTTP existentes.
 
-El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (agudeza, esféricos, cilíndricos, binocular) sin romper la lógica clínica ni el flujo de examen normal.
+El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (esféricos, cilíndricos, binocular) sin romper la lógica clínica ni el flujo de examen normal.
 
 ---
 
@@ -10,11 +10,10 @@ El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (agudeza, e
 
 - **Estado base (`estadoExamen`)**  
   Se agrega una nueva propiedad:
-  - `modo: 'normal' | 'testag' | 'testesf' | 'testcil' | 'testbin'`
+  - `modo: 'normal' | 'testesf' | 'testcil' | 'testbin'`
 
 - **Valores permitidos**
   - `'normal'`: modo por defecto, examen completo estándar (flujo actual).
-  - `'testag'`: modo prueba de **agudeza visual inicial** (ambos ojos).
   - `'testesf'`: modo prueba de **lentes esféricos** (grueso y fino en ambos ojos).
   - `'testcil'`: modo prueba de **lentes cilíndricos** (y ángulo cuando aplique).
   - `'testbin'`: modo prueba de **test binocular**.
@@ -25,7 +24,7 @@ El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (agudeza, e
     - si no se pasa modo, inicializa en `'normal'`.
   - En el endpoint `POST /api/examen/reiniciar`:
     - sin body (o sin `modo`) reinicia en `'normal'`.
-    - con body válido (`testag`, `testesf`, `testcil`, `testbin`) reinicia en ese modo de prueba.
+    - con body válido (`testesf`, `testcil`, `testbin`) reinicia en ese modo de prueba.
 
 ---
 
@@ -34,12 +33,12 @@ El objetivo es poder **ejecutar aisladamente subconjuntos de tests** (agudeza, e
 La activación del modo prueba se hace exclusivamente vía endpoint:
 
 - **Endpoint:** `POST /api/examen/reiniciar`
-- **Body opcional:** `{ "modo": "normal" | "testag" | "testesf" | "testcil" | "testbin" }`
+- **Body opcional:** `{ "modo": "normal" | "testesf" | "testcil" | "testbin" }`
 
 Reglas:
 
 1. Si no se envía body, o no se envía `modo`, el examen reinicia en modo `'normal'`.
-2. Si se envía un `modo` válido (`testag`, `testesf`, `testcil`, `testbin`), reinicia directamente en ese modo de prueba.
+2. Si se envía un `modo` válido (`testesf`, `testcil`, `testbin`), reinicia directamente en ese modo de prueba.
 3. Si se envía un modo inválido, el endpoint responde `400` con mensaje de error.
 
 En este diseño, **ETAPA_1 solo procesa valores del autorefractómetro**. Ya no se activa el modo prueba por texto conversacional del paciente.
@@ -74,7 +73,7 @@ En **ETAPA_3** (`generarPasosEtapa3` en `motorExamen.js`):
    - Tras definir `testActual`, se asigna:
      - `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)`
    - Mapeo estándar:
-     - `agudeza_inicial`, `agudeza_alcanzada` → **ETAPA_4**
+     - `agudeza_alcanzada` → **ETAPA_4**
      - `esferico_grueso`, `esferico_fino`, `cilindrico`, `cilindrico_angulo` → **ETAPA_5**
      - `binocular` → **ETAPA_6**
 
@@ -94,7 +93,6 @@ El resto de ETAPA_3 (comando foróptero inicial R abierto / L cerrado, espera, m
 La función `generarSecuenciaPrueba(modo)` construye una secuencia reducida de tests activos, utilizando los **mismos tipos de test** que el examen normal:
 
 - Tipos reutilizados:
-  - `agudeza_inicial`
   - `esferico_grueso`
   - `esferico_fino`
   - `cilindrico`
@@ -103,19 +101,9 @@ La función `generarSecuenciaPrueba(modo)` construye una secuencia reducida de t
 
 En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando aplica, **primero ojo derecho (R) y luego ojo izquierdo (L)**, excepto el binocular que es siempre `ojo: 'B'`.
 
-#### 5.1. Modo `testag` – Prueba de agudeza visual
+> **Nota (2026):** el modo `testag` y el tipo de test `agudeza_inicial` fueron eliminados del motor. La baseline `agudezaInicial` (0,3) se fija al iniciar `esferico_grueso` por ojo en el examen normal.
 
-- Secuencia:
-  - `[{ tipo: 'agudeza_inicial', ojo: 'R' },`
-  - ` { tipo: 'agudeza_inicial', ojo: 'L' }]`
-- Solo se realiza **agudeza visual inicial** por cada ojo.
-- No se incluyen:
-  - esféricos,
-  - cilíndricos,
-  - agudeza alcanzada,
-  - binocular.
-
-#### 5.2. Modo `testesf` – Prueba de lentes esféricos
+#### 5.1. Modo `testesf` – Prueba de lentes esféricos
 
 - Secuencia:
   - Ojo derecho (R):
@@ -135,7 +123,7 @@ En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando apl
     - tests cilíndricos,
     - binocular.
 
-#### 5.3. Modo `testcil` – Prueba de lentes cilíndricos
+#### 5.2. Modo `testcil` – Prueba de lentes cilíndricos
 
 - Secuencia:
   - Para cada ojo (R y L), se reutiliza la función `determinarTestsActivos(cilindroRecalc)` para decidir:
@@ -151,12 +139,12 @@ En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando apl
     - Si entra en los rangos definidos, se incluyen los tests correspondientes.
   - No se fuerza la ejecución de tests de cilindro cuando la lógica actual los desactiva.
 
-#### 5.4. Modo `testbin` – Prueba binocular
+#### 5.3. Modo `testbin` – Prueba binocular
 
 - Secuencia:
   - `[{ tipo: 'binocular', ojo: 'B' }]`
 - Consideraciones:
-  - **ETAPA_6** sigue `DEFINICIONES_EXAMEN_BINOCULAR.md`: transición *listo*; dos comparaciones (esfera y, si aplica, cilindro) con **variante ya aplicada** antes del `hablar` (mensaje combinado aviso + pregunta *anterior/actual*), TV H @ logMAR 0,4, resultado `{ esfera, cilindro, angulo }` por ojo.
+  - **ETAPA_6** sigue `DEFINICIONES_EXAMEN_BINOCULAR.md`: transición *listo*; dos comparaciones (esfera y, si aplica, cilindro) con **variante ya aplicada** antes del `hablar` (mensaje combinado aviso + pregunta *anterior/actual*), TV H @ logMAR 0,3, resultado `{ esfera, cilindro, angulo }` por ojo.
   - En `testbin`, la línea base es **solo** `valoresRecalculados` (completo por ojo); no hay fallback a `esfericoFino`.
   - El test binocular se ejecuta sin requerir tests monoculares previos.
 
@@ -166,10 +154,10 @@ En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando apl
 
 Para que la estructura de resultados y las funciones auxiliares sigan funcionando tanto en exámenes normales como en exámenes de prueba, se aplican las siguientes reglas:
 
-- **Agudeza visual (cuando no sea el test de agudeza)**
-  - En modos distintos de `testag`:
-    - `estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial` se puede setear a `0`.
-    - `estadoExamen.secuenciaExamen.resultados[ojo].agudezaAlcanzada` se puede setear a `0`.
+- **Agudeza visual (cuando no sea el test de agudeza alcanzada)**
+  - En modos de prueba que no incluyen `agudeza_alcanzada`:
+    - `estadoExamen.secuenciaExamen.resultados[ojo].agudezaInicial` puede quedar en `0.3` (sembrado al primer `esferico_grueso` del ojo en flujo normal) o en valores de relleno según implementación.
+    - `estadoExamen.secuenciaExamen.resultados[ojo].agudezaAlcanzada` se puede setear a `0` si aplica.
   - Esto permite reutilizar funciones que esperan un valor numérico (p. ej. para `calcularValoresFinalesForoptero`) sin dejar `null`.
 
 - **Lentes no probados en el examen de prueba**
@@ -234,7 +222,7 @@ Esto permite al usuario distinguir exámenes normales de exámenes de prueba, ma
   - Repite los mensajes `hablar` que devuelve el backend.
 
 - En modo prueba:
-  - La activación se hace exclusivamente vía `POST /api/examen/reiniciar` enviando `{ "modo": "testag" | "testesf" | "testcil" | "testbin" }`.
+  - La activación se hace exclusivamente vía `POST /api/examen/reiniciar` enviando `{ "modo": "testesf" | "testcil" | "testbin" }`.
   - El backend enviará mensajes claros al paciente indicando que se trata de un **test de prueba** y especificando qué componente se está probando.
 - Tras reiniciar en modo prueba, el primer mensaje al operador/paciente puede venir en la respuesta de `reiniciar` (texto de “modo de prueba” + pedido de valores).
 
@@ -245,7 +233,7 @@ Esto permite al usuario distinguir exámenes normales de exámenes de prueba, ma
 Panel de referencia para operadores:
 
 - **Nuevo examen** → `POST /api/examen/reiniciar` con body `{ "modo": "normal" }`.
-- **Prueba AG / ESF / CIL / BIN** → mismo endpoint con `{ "modo": "testag" | "testesf" | "testcil" | "testbin" }`.
+- **Prueba ESF / CIL / BIN** → mismo endpoint con `{ "modo": "testesf" | "testcil" | "testbin" }`.
 - Polling de `GET /api/examen/detalle` para mostrar `detalle.modo`, valores, tests y estado.
 
 ---
