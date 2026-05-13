@@ -170,7 +170,13 @@ let estadoExamen = {
   iniciado: null,
   finalizado: null,
 
-  deferredPostComparacion: null
+  deferredPostComparacion: null,
+
+  /**
+   * Tras confirmar un test de lentes: si el siguiente es otro test de lentes mismo ojo (grueso→fino, …),
+   * se programa ritual reanclaje + 3s + Sigamos antes de iniciar la comparación (§4.4 P3–P4). null si no aplica.
+   */
+  ritualInterTestsPendiente: null
 };
 
 /**
@@ -256,6 +262,7 @@ export function inicializarExamen(modo = 'normal') {
     adaptacionPreGruesoEmitidaParaIndice: null,
     /** Tras "Sigamos con este.", siguiente llamada sin respuesta ejecuta pasos automáticos pendientes */
     deferredPostComparacion: null,
+    ritualInterTestsPendiente: null,
     secuenciaExamen: {
       testsActivos: [],
       indiceActual: 0,
@@ -1709,6 +1716,57 @@ function lensValorCerca(a, b) {
   return Math.abs(Number(a) - Number(b)) < 0.009;
 }
 
+/** §4.4 P2: el siguiente valor a mostrar es el mismo parámetro que ya está en cara (sin movimiento útil). */
+function comparacionParametroEsNoOp(tipoTest, valorEnCara, valorSiguiente) {
+  if (valorSiguiente == null || valorEnCara == null) return false;
+  if (tipoTest === 'cilindrico_angulo') {
+    return Math.abs(Number(valorSiguiente) - Number(valorEnCara)) < 0.51;
+  }
+  return lensValorCerca(valorEnCara, valorSiguiente);
+}
+
+/**
+ * §4.4: pausa 3s + Sigamos + deferred solo si aplica (p. ej. hubo reanclaje, anterior/igual con cambio; no en P1 actual+cambio ni P2 no-op).
+ */
+function necesitaRitualSigamosPostComparacionLentes({
+  pasosReanchorLen,
+  preferencia,
+  noOpSiguiente
+}) {
+  if (noOpSiguiente) return false;
+  if (preferencia === 'actual') return false;
+  return pasosReanchorLen > 0 || preferencia === 'anterior' || preferencia === 'igual';
+}
+
+/** P3–P4: mismo ojo, transiciones que llevan ritual como entre comparativas intra-test. P5: distinto ojo → false. */
+function debeProgramarRitualEntreTestsLentes(tipoAnterior, ojoAnterior, siguienteTest) {
+  if (!siguienteTest || siguienteTest.ojo !== ojoAnterior) return false;
+  const t2 = siguienteTest.tipo;
+  const pairs = [
+    ['esferico_grueso', 'esferico_fino'],
+    ['esferico_fino', 'cilindrico'],
+    ['cilindrico', 'cilindrico_angulo']
+  ];
+  return pairs.some(([a, b]) => tipoAnterior === a && t2 === b);
+}
+
+/**
+ * @param {string} tipoAnterior — test recién confirmado
+ * @param {number} valorFinal — valor confirmado del test anterior (esfera o cilindro según tipo)
+ */
+function construirRitualEntreTestsLentes(tipoAnterior, ojo, valorFinal) {
+  if (tipoAnterior === 'esferico_grueso') {
+    return { ojo, tipoSoloForoptero: 'esferico_fino', valorParam: valorFinal };
+  }
+  if (tipoAnterior === 'esferico_fino') {
+    return { ojo, tipoSoloForoptero: 'esferico_fino', valorParam: valorFinal };
+  }
+  if (tipoAnterior === 'cilindrico') {
+    return { ojo, tipoSoloForoptero: 'cilindrico', valorParam: valorFinal };
+  }
+  return null;
+}
+
 /**
  * Solo foróptero + esperar_foroptero (sin TV). ETAPA_5 — reanclaje al valor elegido.
  */
@@ -1775,6 +1833,22 @@ async function ejecutarDeferredPostComparacionSiHay() {
 
   if (def.kind === 'ETAPA_5_MOSTRAR_SIGUIENTE') {
     await ejecutarPasosAutomaticamente(def.pasosMostrar);
+    const pasos = generarPasosEtapa5();
+    if (!pasos.ok) return pasos;
+    await ejecutarPasosAutomaticamente(pasos.pasos || []);
+    const pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+    return {
+      ok: true,
+      pasos: pasosParaAgente,
+      contexto: {
+        ...(pasos.contexto || {}),
+        etapa: estadoExamen.etapa,
+        testActual: estadoExamen.secuenciaExamen.testActual
+      }
+    };
+  }
+
+  if (def.kind === 'ETAPA_5_RITUAL_INTER_TEST_COMPLETAR') {
     const pasos = generarPasosEtapa5();
     if (!pasos.ok) return pasos;
     await ejecutarPasosAutomaticamente(pasos.pasos || []);
@@ -1861,15 +1935,36 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
       
       // Si se confirmó el resultado, generar pasos del siguiente test
       if (resultado.resultadoConfirmado) {
-        // Generar pasos del siguiente test
+        const ritualEntre = estadoExamen.ritualInterTestsPendiente;
+        if (ritualEntre) {
+          estadoExamen.ritualInterTestsPendiente = null;
+          const pasosSolo = generarPasosSoloForopteroComparacion(
+            ritualEntre.ojo,
+            ritualEntre.tipoSoloForoptero,
+            ritualEntre.valorParam
+          );
+          await ejecutarPasosAutomaticamente(pasosSolo);
+          await ejecutarPasosAutomaticamente([
+            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
+          ]);
+          estadoExamen.deferredPostComparacion = { kind: 'ETAPA_5_RITUAL_INTER_TEST_COMPLETAR' };
+          return {
+            ok: true,
+            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            contexto: {
+              etapa: estadoExamen.etapa,
+              testActual: estadoExamen.secuenciaExamen.testActual,
+              postComparacionContinuar: true
+            }
+          };
+        }
+
         const pasos = generarPasos();
-        
-        // Ejecutar pasos automáticamente
+
         await ejecutarPasosAutomaticamente(pasos.pasos || []);
-        
-        // Filtrar: solo retornar pasos de tipo "hablar"
-        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
-        
+
+        const pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+
         return {
           ok: true,
           pasos: pasosParaAgente,
@@ -1923,22 +2018,57 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
         }
 
         await ejecutarPasosAutomaticamente(pasosReanchor);
-        await ejecutarPasosAutomaticamente([
-          { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
-        ]);
 
-        estadoExamen.deferredPostComparacion = {
-          kind: 'ETAPA_5_MOSTRAR_SIGUIENTE',
-          pasosMostrar
-        };
+        const pref = resultado.preferenciaAplicada ?? 'actual';
+        const noOpSiguiente = comparacionParametroEsNoOp(
+          testActual.tipo,
+          caraAntesUpdate,
+          resultado.valorAMostrar
+        );
+        const necesitaRitualPost = necesitaRitualSigamosPostComparacionLentes({
+          pasosReanchorLen: pasosReanchor.length,
+          preferencia: pref,
+          noOpSiguiente
+        });
 
+        if (necesitaRitualPost) {
+          await ejecutarPasosAutomaticamente([
+            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
+          ]);
+
+          estadoExamen.deferredPostComparacion = {
+            kind: 'ETAPA_5_MOSTRAR_SIGUIENTE',
+            pasosMostrar
+          };
+
+          return {
+            ok: true,
+            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            contexto: {
+              etapa: estadoExamen.etapa,
+              testActual,
+              postComparacionContinuar: true
+            }
+          };
+        }
+
+        if (!noOpSiguiente) {
+          await ejecutarPasosAutomaticamente(pasosMostrar);
+        }
+
+        const pasosSig = generarPasosEtapa5();
+        if (!pasosSig.ok) {
+          return { ok: false, error: pasosSig.error || 'Error generando pasos ETAPA_5' };
+        }
+        await ejecutarPasosAutomaticamente(pasosSig.pasos || []);
+        const pasosParaAgenteSig = (pasosSig.pasos || []).filter((p) => p.tipo === 'hablar');
         return {
           ok: true,
-          pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+          pasos: pasosParaAgenteSig,
           contexto: {
+            ...(pasosSig.contexto || {}),
             etapa: estadoExamen.etapa,
-            testActual,
-            postComparacionContinuar: true
+            testActual
           }
         };
       }
@@ -1994,27 +2124,46 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
       // Si necesita mostrar otro lente, generar pasos
       if (resultado.necesitaMostrarLente) {
         if (resultado.postComparacionTrasEsfera) {
-          const pasosReanchor = [];
           if (resultado.reanclajeRxBinocularIntermedio) {
-            const rxElegida = copiarRxPar(estadoExamen.binocularEstado.rxActiva);
-            pasosReanchor.push(
-              { tipo: 'foroptero', orden: 1, foroptero: foropteroDesdeRx(rxElegida) },
+            const pasosReanchor = [
+              {
+                tipo: 'foroptero',
+                orden: 1,
+                foroptero: foropteroDesdeRx(copiarRxPar(estadoExamen.binocularEstado.rxActiva))
+              },
               { tipo: 'esperar_foroptero', orden: 2 }
-            );
+            ];
+            await ejecutarPasosAutomaticamente(pasosReanchor);
+            await ejecutarPasosAutomaticamente([
+              { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
+            ]);
+            estadoExamen.deferredPostComparacion = { kind: 'ETAPA_6_GENERAR' };
+            return {
+              ok: true,
+              pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+              contexto: {
+                etapa: 'ETAPA_6',
+                testActual: estadoExamen.secuenciaExamen.testActual,
+                binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado),
+                postComparacionContinuar: true
+              }
+            };
           }
-          await ejecutarPasosAutomaticamente(pasosReanchor);
-          await ejecutarPasosAutomaticamente([
-            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
-          ]);
-          estadoExamen.deferredPostComparacion = { kind: 'ETAPA_6_GENERAR' };
+
+          const pasosCil = generarPasosEtapa6();
+          if (!pasosCil.ok) {
+            return { ok: false, error: pasosCil.error || 'Error generando pasos ETAPA_6' };
+          }
+          await ejecutarPasosAutomaticamente(pasosCil.pasos || []);
+          const pasosParaAgenteCil = (pasosCil.pasos || []).filter((p) => p.tipo === 'hablar');
           return {
             ok: true,
-            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            pasos: pasosParaAgenteCil,
             contexto: {
+              ...(pasosCil.contexto || {}),
               etapa: 'ETAPA_6',
               testActual: estadoExamen.secuenciaExamen.testActual,
-              binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado),
-              postComparacionContinuar: true
+              binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado)
             }
           };
         }
@@ -3185,7 +3334,16 @@ function confirmarResultado(valorFinal) {
   
   // Avanzar al siguiente test
   const siguienteTest = avanzarTest();
-  
+
+  estadoExamen.ritualInterTestsPendiente = null;
+  if (
+    siguienteTest &&
+    estadoExamen.etapa === 'ETAPA_5' &&
+    debeProgramarRitualEntreTestsLentes(tipo, ojo, siguienteTest)
+  ) {
+    estadoExamen.ritualInterTestsPendiente = construirRitualEntreTestsLentes(tipo, siguienteTest.ojo, valorFinal);
+  }
+
   // Si el siguiente test es agudeza_alcanzada, resetear estado de agudeza
   // Esto asegura que el estado esté limpio para agudeza_alcanzada
   // y evita problemas de inicialización cuando cambia de lentes a agudeza

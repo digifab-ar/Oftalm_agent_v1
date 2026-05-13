@@ -119,6 +119,8 @@ Por cada ojo (R / L), al **finalizar** el binocular, guardar **esfera, cilindro 
 
 En la implementación actual, **tras la transición “listo”**, el backend aplica primero la **variante** del paso (foróptero) y luego emite **un solo** `pasos[].mensaje` que combina el aviso y la pregunta comparativa, de modo que **el paciente ya tiene puestos los lentes de la variante** cuando oye el texto (coherente con “otro par” y con “anterior vs actual”).
 
+**Entre la respuesta de la comparación esférica y la fase cilíndrica** (si aplica), el ritual de reanclaje foróptero, pausa **3 s** y `Sigamos con este.` sigue el plan `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` **§4.3–§4.4**: con preferencia **anterior** (incluye `igual` mapeado a anterior) se reancla al resultado esférico elegido **sin TV** en ese tramo, luego pausa + mensaje, luego variante cilíndrica; con **actual**, **sin** reanclaje intermedio ni pausa/Sigamos antes del cilindro.
+
 Texto recomendado (literal en motor):
 
 > «Ahora vamos a usar otro par de lentes, y me vas a decir si ves mejor o peor. ¿Ves mejor con la configuración anterior o con la actual?»

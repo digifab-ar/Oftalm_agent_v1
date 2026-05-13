@@ -140,6 +140,7 @@ Motor de examen visual implementado como state machine.
 - **Secuencia en examen normal:** tras `agudeza_alcanzada` de L, el test `binocular` (`testActual.ojo: 'B'`) aplica ajuste final con **ambos ojos abiertos** (línea base: esférico fino por ojo; cilindro/eje según test cilíndrico o `valoresRecalculados` — ver `DEFINICIONES_EXAMEN_BINOCULAR.md`).
 - **Transición clínica:** foróptero en base, TV H @ logMAR 0,3, mensaje *“Ahora vamos a ver con ambos ojos… avisame cuando estés listo”*; el paciente confirma continuidad (`listo`, `ok`, etc.); el agente envía **solo** `respuestaPaciente` (sin `interpretacionComparacion`).
 - **Comparaciones (esférica → cilíndrica opcional):** en cada ronda el backend aplica la **variante** (0,50 D hacia el cero) y emite un **único** `hablar` que concatena el aviso de *otro par* y la pregunta *anterior / actual*; en ese turno el paciente ya viste con la variante puesta, alineado con el protocolo. Las respuestas se envían con `interpretacionComparacion`.
+- **Tras la comparación esférica (reanclaje / 3 s / Sigamos antes del cilindro):** ver `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` **§4.3–§4.4**: rama **anterior** (incluye `igual` mapeado a anterior) → reanclaje foróptero al resultado esférico **sin TV**, luego **3 s** + `Sigamos con este.`, luego variante cilíndrica; rama **actual** → **sin** reanclaje intermedio ni pausa/Sigamos antes del cilindro (**P1 B**).
 - **Resultado:** `resultados.R.binocular` y `resultados.L.binocular` como `{ esfera, cilindro, angulo }` por ojo. Modo prueba: `testbin` usa `valoresRecalculados` completo; ver `examenprueba.md`.
 - **Agente:** `src/app/agentConfigs/chatSupervisor/index.ts` — reglas de payload por mensaje (transición “listo” vs pregunta comparativa); ver instrucciones en el propio archivo.
 
@@ -231,7 +232,7 @@ Configuración del agente AI conversacional.
 6. Misma lógica de escalera y doble confirmación que el antiguo test de agudeza inicial; la diferencia es que el valor de arranque proviene del baseline sembrado (0,3), no de una medición previa
 
 **Cambio de ojo entre monoculares (ETAPA_5):**
-- Al pasar del último test de lentes de **R** al primer test de **L** (típicamente `esferico_grueso` L), la oclusión y el foróptero se aplican según los pasos generados en ETAPA_5 (`generarPasosMostrarLente` y flujo de comparación), no vía ETAPA_4.
+- Al pasar del último test de lentes de **R** al primer test de **L** (típicamente `esferico_grueso` L), la oclusión y el foróptero se aplican según los pasos generados en ETAPA_5 (`generarPasosMostrarLente` y flujo de comparación), no vía ETAPA_4. **Producto (mayo 2026):** no se añade ritual extra **3 s + “Sigamos con este.”** encima del bloque de adaptación / pre-grueso ya existente — ver `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` **§4.4 P5 B**.
 
 #### **ETAPA_5: Tests de Lentes**
 **Estado:** ✅ Implementado completamente
@@ -254,6 +255,7 @@ Configuración del agente AI conversacional.
    - Transición automática desde esférico grueso sin mencionar el test al paciente
    - Sin mensaje introductorio específico del test (parte del flujo continuo de comparación de lentes)
    - **Garantía conversacional ETAPA_5:** aunque no haya introducción, el backend siempre retorna al menos un paso `hablar` con la pregunta de comparación
+   - **Post-comparación (reanclaje / pausa / “Sigamos con este.”):** contrato detallado en `reference/foroptero-server/PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` **§4.3–§4.4** (P1–P5, mayo 2026): el mensaje y los **3 s** van **juntos** y **solo** cuando la regla lo exige (p. ej. tras reanclaje “vuelta atrás”, entre tests mismo ojo grueso→fino / fino→cil / cil→ángulo, binocular esfera→cil con **anterior**); con **actual** sin reanclaje y **siguiente** lente distinto → **sin** pausa ni Sigamos antes de mover; **no-op** → sin Sigamos ni turno vacío (**P2**); **R→L** sin duplicar ritual sobre adaptación (**P5**). Hoy el motor cubre sobre todo respuestas vía `necesitaMostrarLente`; alinear **entre tests** y condicionales al plan puede requerir trabajo adicional en `motorExamen.js` (plan §5, §10–§11).
    - Guardado de resultados en `resultados[ojo].esfericoFino`
    - Probado y funcionando correctamente
    - **Bug corregido (2025-01-27):** Sistema de confirmación ahora incrementa correctamente las confirmaciones en lugar de resetearlas, evitando comparaciones duplicadas (ej: 0.75 vs 0.75)
