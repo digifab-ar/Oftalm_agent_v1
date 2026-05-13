@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 
 export function ForopteroControl() {
     const API_ESTADO = "https://foroptero-production.up.railway.app/api/estado"
+    const API_REGISTRO_CSV =
+        "https://foroptero-production.up.railway.app/api/examen/registro.csv"
 
     // ---------------- Estados del panel ----------------
     const [rEsfera, setREsfera] = useState(0)
@@ -195,6 +197,33 @@ export function ForopteroControl() {
             setStatus(`Examen reiniciado en modo ${modo}`)
         } catch {
             setStatus("⚠️ Error reiniciando examen")
+        }
+    }
+
+    async function descargarRegistroCsv() {
+        try {
+            setStatus("Descargando registro CSV…")
+            const res = await fetch(API_REGISTRO_CSV, { method: "GET" })
+            if (!res.ok) {
+                setStatus(`⚠️ Error al obtener CSV (${res.status})`)
+                return
+            }
+            const blob = await res.blob()
+            const cd = res.headers.get("Content-Disposition")
+            let filename = "examen-registro.csv"
+            const m = cd?.match(/filename="([^"]+)"/)
+            if (m?.[1]) filename = m[1]
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+            setStatus("CSV del examen descargado")
+        } catch {
+            setStatus("⚠️ Error descargando CSV")
         }
     }
 
@@ -532,6 +561,18 @@ export function ForopteroControl() {
                             onClick={() => reiniciarExamen("testbin")}
                         >
                             Prueba BIN
+                        </button>
+
+                        <button
+                            style={{
+                                ...bigBtn,
+                                background: "#15803d",
+                                color: "#fff",
+                            }}
+                            type="button"
+                            onClick={() => descargarRegistroCsv()}
+                        >
+                            Descargar CSV registro
                         </button>
                     </div>
                 </div>

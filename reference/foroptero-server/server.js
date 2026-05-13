@@ -6,7 +6,9 @@ import {
   obtenerInstrucciones,
   obtenerEstado,
   obtenerDetalleExamen,
-  inicializarEjecutores
+  inicializarEjecutores,
+  generarRegistroExamenCsv,
+  registrarPasosOftalmologoDesdeRespuesta
 } from "./motorExamen.js";
 
 // ============================================================
@@ -319,7 +321,8 @@ app.post("/api/examen/instrucciones", async (req, res) => {
     if (!resultado.ok) {
       return res.status(400).json(resultado);
     }
-    
+
+    registrarPasosOftalmologoDesdeRespuesta(resultado);
     res.json(resultado);
   } catch (error) {
     console.error("❌ Error obteniendo instrucciones:", error);
@@ -341,6 +344,23 @@ app.get("/api/examen/estado", (req, res) => {
       ok: false,
       error: error.message || "Error al obtener estado"
     });
+  }
+});
+
+// GET /api/examen/registro.csv — POC: registro del examen en curso (PLAN_POC_REGISTRO_EXAMEN_CSV)
+app.get("/api/examen/registro.csv", (req, res) => {
+  try {
+    const csv = generarRegistroExamenCsv();
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="examen-registro-${stamp}.csv"`
+    );
+    res.send(csv);
+  } catch (error) {
+    console.error("❌ Error generando registro CSV:", error);
+    res.status(500).send("Error al generar CSV");
   }
 });
 
@@ -377,7 +397,7 @@ app.post("/api/examen/reiniciar", (req, res) => {
       ? 'Perfecto, vamos a reiniciar el examen.'
       : `Perfecto, reiniciamos en modo de prueba ${modoFinal}.`;
 
-    res.json({
+    const payload = {
       ok: true,
       mensaje: "Examen reiniciado",
       estado: estado,
@@ -388,7 +408,9 @@ app.post("/api/examen/reiniciar", (req, res) => {
           mensaje: `${mensajeModo} Escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0`
         }
       ]
-    });
+    };
+    registrarPasosOftalmologoDesdeRespuesta(payload);
+    res.json(payload);
   } catch (error) {
     console.error("❌ Error reiniciando examen:", error);
     res.status(500).json({

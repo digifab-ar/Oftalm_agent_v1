@@ -179,6 +179,11 @@ let estadoExamen = {
   ritualInterTestsPendiente: null
 };
 
+/** Registro POC exportable a CSV (misma vida útil que estadoExamen) */
+let registroExamenEventos = [];
+/** Texto autorefractor tal como lo envió el paciente (ETAPA_1 válida) */
+let registroTextoValoresInicialesPaciente = null;
+
 /**
  * Inicializa el examen (resetea todo el estado)
  */
@@ -291,6 +296,8 @@ export function inicializarExamen(modo = 'normal') {
     iniciado: Date.now(),
     finalizado: null
   };
+
+  registroExamenLimpiar();
   
   console.log(`✅ Examen inicializado (modo: ${modoInicial})`);
   return estadoExamen;
@@ -414,6 +421,7 @@ function procesarRespuestaEtapa1(respuestaPaciente) {
   
   // Guardar valores
   estadoExamen.valoresIniciales = validacion.valores;
+  registroTextoValoresInicialesPaciente = respuestaPaciente.trim();
   estadoExamen.etapa = 'ETAPA_2';
   
   console.log('✅ Valores iniciales guardados:', validacion.valores);
@@ -1557,6 +1565,7 @@ async function ejecutarPasosAutomaticamente(pasos) {
         const resultado = await ejecutarComandoForopteroInterno(paso.foroptero);
         ejecutados.push({ tipo: 'foroptero', resultado });
         console.log('✅ Comando foróptero ejecutado:', resultado);
+        registroExamenAppendEvento('Foroptero-TV', registroDescribirComandoForoptero(paso.foroptero));
         
         // Esperar un momento después de ejecutar foróptero (para que el dispositivo procese)
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1581,6 +1590,10 @@ async function ejecutarPasosAutomaticamente(pasos) {
         });
         ejecutados.push({ tipo: 'tv', resultado });
         console.log('✅ Comando TV ejecutado:', resultado);
+        registroExamenAppendEvento(
+          'Foroptero-TV',
+          `TV: letra ${paso.letra ?? '—'} @ logMAR ${paso.logmar ?? '—'}`
+        );
         
         // Esperar un momento después de ejecutar TV
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -1893,6 +1906,14 @@ async function ejecutarDeferredPostComparacionSiHay() {
  * @param {object|null} interpretacionAgudeza - Interpretación estructurada del agente (ETAPA_4 y pre-grueso visual)
  */
 export async function obtenerInstrucciones(respuestaPaciente = null, interpretacionAgudeza = null, interpretacionComparacion = null) {
+  if (respuestaPaciente != null && String(respuestaPaciente).trim() !== '') {
+    registroExamenRegistrarPacienteEInterpretacion(
+      String(respuestaPaciente).trim(),
+      interpretacionAgudeza,
+      interpretacionComparacion
+    );
+  }
+
   const sinRespuestaPaciente =
     respuestaPaciente == null ||
     (typeof respuestaPaciente === 'string' && respuestaPaciente.trim() === '');
@@ -3876,5 +3897,205 @@ export function obtenerDetalleExamen() {
       }
     }
   };
+}
+
+// ============================================================
+// REGISTRO POC — export CSV (ver PLAN_POC_REGISTRO_EXAMEN_CSV.md)
+// ============================================================
+
+const REGISTRO_TZ = 'America/Argentina/Buenos_Aires';
+
+function registroExamenLimpiar() {
+  registroExamenEventos = [];
+  registroTextoValoresInicialesPaciente = null;
+}
+
+function registroExamenFormatTimestampAR(d = new Date()) {
+  try {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: REGISTRO_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+      .format(d)
+      .replace('T', ' ');
+  } catch {
+    const t = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+    return t.toISOString().slice(0, 19).replace('T', ' ');
+  }
+}
+
+function registroExamenEscapeCsvCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function registroFmtDiop(v) {
+  const x = Number(v);
+  if (!Number.isFinite(x)) return '?';
+  if (Math.abs(x) < 1e-9) return '+0.00';
+  const t = x.toFixed(2);
+  return x > 0 ? `+${t}` : t;
+}
+
+function registroFmtCadenaRxDesdeVals(vR, vL) {
+  if (
+    vR?.esfera == null ||
+    vR?.cilindro == null ||
+    vR?.angulo == null ||
+    vL?.esfera == null ||
+    vL?.cilindro == null ||
+    vL?.angulo == null
+  ) {
+    return 'pendiente';
+  }
+  return `<R> ${registroFmtDiop(vR.esfera)} , ${registroFmtDiop(vR.cilindro)} , ${vR.angulo} / <L> ${registroFmtDiop(vL.esfera)} , ${registroFmtDiop(vL.cilindro)} , ${vL.angulo}`;
+}
+
+function registroDescribirComandoForoptero(cmd) {
+  if (!cmd || typeof cmd !== 'object') return '(sin comando foróptero)';
+  const ojos = ['R', 'L'];
+  const partes = [];
+  for (const eye of ojos) {
+    const o = cmd[eye];
+    if (!o || typeof o !== 'object') continue;
+    const bits = [];
+    if (o.esfera != null) bits.push(`Esf ${registroFmtDiop(o.esfera)}`);
+    if (o.cilindro != null) bits.push(`Cil ${registroFmtDiop(o.cilindro)}`);
+    if (o.angulo != null && Number(o.cilindro) !== 0) bits.push(`@${o.angulo}°`);
+    if (o.occlusion) bits.push(`(${o.occlusion})`);
+    if (bits.length) partes.push(`<${eye}> ${bits.join(' / ')}`);
+    else if (o.occlusion) partes.push(`<${eye}> (${o.occlusion})`);
+  }
+  return partes.length ? partes.join('; ') : JSON.stringify(cmd);
+}
+
+function registroExamenAppendEvento(origen, detalle) {
+  registroExamenEventos.push({
+    timestamp: registroExamenFormatTimestampAR(),
+    origen,
+    detalle: typeof detalle === 'string' ? detalle : JSON.stringify(detalle)
+  });
+}
+
+function registroExamenRegistrarPacienteEInterpretacion(rp, ia, ic) {
+  registroExamenAppendEvento('Paciente', rp);
+  if (ia && typeof ia === 'object') {
+    registroExamenAppendEvento(
+      'Interpretacion',
+      JSON.stringify({ tipo: 'agudeza', resultado: ia.resultado, letraIdentificada: ia.letraIdentificada ?? null })
+    );
+  }
+  if (ic && typeof ic === 'object') {
+    registroExamenAppendEvento(
+      'Interpretacion',
+      JSON.stringify({
+        tipo: 'comparacion',
+        preferencia: ic.preferencia,
+        confianza: ic.confianza ?? null
+      })
+    );
+  }
+}
+
+/**
+ * Llamar desde server.js tras cada respuesta con pasos `hablar` para el agente.
+ * @param {{ ok?: boolean, pasos?: Array<{ tipo?: string, mensaje?: string }> }} resultado
+ */
+export function registrarPasosOftalmologoDesdeRespuesta(resultado) {
+  if (!resultado?.ok || !Array.isArray(resultado.pasos)) return;
+  for (const p of resultado.pasos) {
+    if (p?.tipo === 'hablar' && typeof p.mensaje === 'string' && p.mensaje.trim()) {
+      registroExamenAppendEvento('Oftalmologo', p.mensaje.trim());
+    }
+  }
+}
+
+function registroFmtValorResultado(v) {
+  if (v == null) return 'pendiente';
+  if (typeof v === 'object') {
+    const r = v;
+    if (r.esfera != null && r.cilindro != null && r.angulo != null) {
+      return `Esf ${registroFmtDiop(r.esfera)} / Cil ${registroFmtDiop(r.cilindro)} @ ${r.angulo}°`;
+    }
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
+/**
+ * Genera el contenido UTF-8 del CSV del examen en curso (POC).
+ */
+export function generarRegistroExamenCsv() {
+  const lineas = [];
+  const sep = ',';
+  const push2 = (a, b) =>
+    lineas.push(`${registroExamenEscapeCsvCell(a)}${sep}${registroExamenEscapeCsvCell(b)}`);
+
+  push2('exportado_en', registroExamenFormatTimestampAR());
+  push2('zona_horaria', REGISTRO_TZ);
+  push2('etapa_actual', estadoExamen.etapa ?? '');
+  push2('modo_examen', estadoExamen.modo ?? '');
+
+  const viStr =
+    registroTextoValoresInicialesPaciente && registroTextoValoresInicialesPaciente.trim() !== ''
+      ? registroTextoValoresInicialesPaciente.trim()
+      : registroFmtCadenaRxDesdeVals(estadoExamen.valoresIniciales?.R, estadoExamen.valoresIniciales?.L);
+  push2('Valores iniciales', viStr);
+
+  const vrStr = registroFmtCadenaRxDesdeVals(
+    estadoExamen.valoresRecalculados?.R,
+    estadoExamen.valoresRecalculados?.L
+  );
+  push2('Valores recalculados', vrStr);
+
+  lineas.push(`Timestamp${sep}Origen${sep}Detalle`);
+  for (const ev of registroExamenEventos) {
+    lineas.push(
+      [
+        registroExamenEscapeCsvCell(ev.timestamp),
+        registroExamenEscapeCsvCell(ev.origen),
+        registroExamenEscapeCsvCell(ev.detalle)
+      ].join(sep)
+    );
+  }
+
+  lineas.push(`Test${sep}Valor`);
+  const res = estadoExamen.secuenciaExamen?.resultados;
+  if (res?.R) {
+    const r = res.R;
+    push2('Agudeza inicial (R)', registroFmtValorResultado(r.agudezaInicial));
+    push2('Esférico Grueso (R)', registroFmtValorResultado(r.esfericoGrueso));
+    push2('Esférico Fino (R)', registroFmtValorResultado(r.esfericoFino));
+    push2('Cilíndrico (R)', registroFmtValorResultado(r.cilindrico));
+    push2('Cilíndrico ángulo (R)', registroFmtValorResultado(r.cilindricoAngulo));
+    push2('Agudeza alcanzada (R)', registroFmtValorResultado(r.agudezaAlcanzada));
+  }
+  if (res?.L) {
+    const L = res.L;
+    push2('Agudeza inicial (L)', registroFmtValorResultado(L.agudezaInicial));
+    push2('Esférico Grueso (L)', registroFmtValorResultado(L.esfericoGrueso));
+    push2('Esférico Fino (L)', registroFmtValorResultado(L.esfericoFino));
+    push2('Cilíndrico (L)', registroFmtValorResultado(L.cilindrico));
+    push2('Cilíndrico ángulo (L)', registroFmtValorResultado(L.cilindricoAngulo));
+    push2('Agudeza alcanzada (L)', registroFmtValorResultado(L.agudezaAlcanzada));
+  }
+  if (res?.R?.binocular != null && res?.L?.binocular != null) {
+    push2(
+      'Binocular (B)',
+      `R: ${registroFmtValorResultado(res.R.binocular)} / L: ${registroFmtValorResultado(res.L.binocular)}`
+    );
+  } else {
+    push2('Binocular (B)', 'pendiente');
+  }
+
+  return `\ufeff${lineas.join('\r\n')}`;
 }
 
