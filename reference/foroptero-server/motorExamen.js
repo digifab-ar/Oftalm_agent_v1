@@ -168,7 +168,9 @@ let estadoExamen = {
   
   // Timestamps
   iniciado: null,
-  finalizado: null
+  finalizado: null,
+
+  deferredPostComparacion: null
 };
 
 /**
@@ -252,6 +254,8 @@ export function inicializarExamen(modo = 'normal') {
     esperaListoCambioOjo: null,
     preGruesoVisual: null,
     adaptacionPreGruesoEmitidaParaIndice: null,
+    /** Tras "Sigamos con este.", siguiente llamada sin respuesta ejecuta pasos automáticos pendientes */
+    deferredPostComparacion: null,
     secuenciaExamen: {
       testsActivos: [],
       indiceActual: 0,
@@ -1696,6 +1700,116 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
   };
 }
 
+/** Tras una comparación de lentes: el agente repite este texto literal (única versión). */
+const MSG_POST_COMPARACION_LENTES = 'Sigamos con este.';
+const POST_COMPARACION_ESPERA_SEG = 3;
+
+function lensValorCerca(a, b) {
+  if (a == null || b == null) return a === b;
+  return Math.abs(Number(a) - Number(b)) < 0.009;
+}
+
+/**
+ * Solo foróptero + esperar_foroptero (sin TV). ETAPA_5 — reanclaje al valor elegido.
+ */
+function generarPasosSoloForopteroComparacion(ojo, tipoTest, valorParametro) {
+  const otro = ojo === 'R' ? 'L' : 'R';
+  let configForoptero;
+  if (tipoTest === 'esferico_grueso' || tipoTest === 'esferico_fino') {
+    configForoptero = {
+      [ojo]: {
+        esfera: valorParametro,
+        cilindro: estadoExamen.valoresRecalculados[ojo].cilindro,
+        angulo: estadoExamen.valoresRecalculados[ojo].angulo,
+        occlusion: 'open'
+      },
+      [otro]: { occlusion: 'close' }
+    };
+  } else if (tipoTest === 'cilindrico') {
+    const esferaFinal =
+      estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino ||
+      estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso ||
+      estadoExamen.valoresRecalculados[ojo].esfera;
+    configForoptero = {
+      [ojo]: {
+        esfera: esferaFinal,
+        cilindro: valorParametro,
+        angulo: estadoExamen.valoresRecalculados[ojo].angulo,
+        occlusion: 'open'
+      },
+      [otro]: { occlusion: 'close' }
+    };
+  } else if (tipoTest === 'cilindrico_angulo') {
+    const esferaFinal =
+      estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino ||
+      estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso ||
+      estadoExamen.valoresRecalculados[ojo].esfera;
+    const cilindroFinal =
+      estadoExamen.secuenciaExamen.resultados[ojo].cilindrico ||
+      estadoExamen.valoresRecalculados[ojo].cilindro;
+    configForoptero = {
+      [ojo]: {
+        esfera: esferaFinal,
+        cilindro: cilindroFinal,
+        angulo: valorParametro,
+        occlusion: 'open'
+      },
+      [otro]: { occlusion: 'close' }
+    };
+  } else {
+    return [];
+  }
+  return [
+    { tipo: 'foroptero', orden: 1, foroptero: configForoptero },
+    { tipo: 'esperar_foroptero', orden: 2 }
+  ];
+}
+
+/**
+ * Tras "Sigamos con este.", la siguiente llamada sin respuesta ejecuta lentes + pregunta pendientes.
+ */
+async function ejecutarDeferredPostComparacionSiHay() {
+  const def = estadoExamen.deferredPostComparacion;
+  if (!def) return null;
+  estadoExamen.deferredPostComparacion = null;
+
+  if (def.kind === 'ETAPA_5_MOSTRAR_SIGUIENTE') {
+    await ejecutarPasosAutomaticamente(def.pasosMostrar);
+    const pasos = generarPasosEtapa5();
+    if (!pasos.ok) return pasos;
+    await ejecutarPasosAutomaticamente(pasos.pasos || []);
+    const pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+    return {
+      ok: true,
+      pasos: pasosParaAgente,
+      contexto: {
+        ...(pasos.contexto || {}),
+        etapa: estadoExamen.etapa,
+        testActual: estadoExamen.secuenciaExamen.testActual
+      }
+    };
+  }
+
+  if (def.kind === 'ETAPA_6_GENERAR') {
+    const pasos = generarPasosEtapa6();
+    if (!pasos.ok) return pasos;
+    await ejecutarPasosAutomaticamente(pasos.pasos || []);
+    const pasosParaAgente = (pasos.pasos || []).filter((p) => p.tipo === 'hablar');
+    return {
+      ok: true,
+      pasos: pasosParaAgente,
+      contexto: {
+        ...(pasos.contexto || {}),
+        etapa: 'ETAPA_6',
+        testActual: estadoExamen.secuenciaExamen.testActual,
+        binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado)
+      }
+    };
+  }
+
+  return null;
+}
+
 /**
  * Obtiene instrucciones (pasos) para el agente
  * Si hay respuestaPaciente, la procesa primero
@@ -1705,6 +1819,15 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
  * @param {object|null} interpretacionAgudeza - Interpretación estructurada del agente (ETAPA_4 y pre-grueso visual)
  */
 export async function obtenerInstrucciones(respuestaPaciente = null, interpretacionAgudeza = null, interpretacionComparacion = null) {
+  const sinRespuestaPaciente =
+    respuestaPaciente == null ||
+    (typeof respuestaPaciente === 'string' && respuestaPaciente.trim() === '');
+
+  if (sinRespuestaPaciente && estadoExamen.deferredPostComparacion) {
+    const salidaDeferred = await ejecutarDeferredPostComparacionSiHay();
+    if (salidaDeferred) return salidaDeferred;
+  }
+
   // Si hay respuesta del paciente, procesarla primero
   if (respuestaPaciente) {
     if (estadoExamen.preGruesoVisual?.activa) {
@@ -1761,8 +1884,12 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
       if (resultado.necesitaMostrarLente) {
         const estado = estadoExamen.comparacionActual;
         const testActual = estadoExamen.secuenciaExamen.testActual;
-        
-        // Usar la función correcta según el tipo de test
+
+        const caraAntesUpdate = estado.valorActual;
+        estado.valorAnterior = estado.valorActual;
+        estado.valorActual = resultado.valorAMostrar;
+        estado.faseComparacion = 'mostrando_alternativo';
+
         let pasosMostrar;
         if (testActual?.tipo === 'cilindrico') {
           pasosMostrar = generarPasosMostrarLenteCilindrico(
@@ -1786,30 +1913,32 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
             estado.logmarActual
           );
         }
-        
-        // Actualizar estado
-        estado.valorAnterior = estado.valorActual;
-        estado.valorActual = resultado.valorAMostrar;
-        estado.faseComparacion = 'mostrando_alternativo';
-        
-        // Ejecutar pasos automáticamente
-        await ejecutarPasosAutomaticamente(pasosMostrar);
-        
-        // Generar pasos de pregunta
-        const pasos = generarPasosEtapa5();
-        
-        // Ejecutar pasos automáticamente (si hay más)
-        await ejecutarPasosAutomaticamente(pasos.pasos || []);
-        
-        // Filtrar: solo retornar pasos de tipo "hablar"
-        const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
-        
+
+        const eleg = resultado.valorElegidoReanclaje;
+        const pasosReanchor = [];
+        if (eleg != null && !lensValorCerca(eleg, caraAntesUpdate)) {
+          pasosReanchor.push(
+            ...generarPasosSoloForopteroComparacion(estado.ojo, testActual.tipo, eleg)
+          );
+        }
+
+        await ejecutarPasosAutomaticamente(pasosReanchor);
+        await ejecutarPasosAutomaticamente([
+          { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
+        ]);
+
+        estadoExamen.deferredPostComparacion = {
+          kind: 'ETAPA_5_MOSTRAR_SIGUIENTE',
+          pasosMostrar
+        };
+
         return {
           ok: true,
-          pasos: pasosParaAgente,
-          contexto: pasos.contexto || {
+          pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+          contexto: {
             etapa: estadoExamen.etapa,
-            testActual: estadoExamen.secuenciaExamen.testActual
+            testActual,
+            postComparacionContinuar: true
           }
         };
       }
@@ -1864,12 +1993,38 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
       
       // Si necesita mostrar otro lente, generar pasos
       if (resultado.necesitaMostrarLente) {
+        if (resultado.postComparacionTrasEsfera) {
+          const pasosReanchor = [];
+          if (resultado.reanclajeRxBinocularIntermedio) {
+            const rxElegida = copiarRxPar(estadoExamen.binocularEstado.rxActiva);
+            pasosReanchor.push(
+              { tipo: 'foroptero', orden: 1, foroptero: foropteroDesdeRx(rxElegida) },
+              { tipo: 'esperar_foroptero', orden: 2 }
+            );
+          }
+          await ejecutarPasosAutomaticamente(pasosReanchor);
+          await ejecutarPasosAutomaticamente([
+            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
+          ]);
+          estadoExamen.deferredPostComparacion = { kind: 'ETAPA_6_GENERAR' };
+          return {
+            ok: true,
+            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            contexto: {
+              etapa: 'ETAPA_6',
+              testActual: estadoExamen.secuenciaExamen.testActual,
+              binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado),
+              postComparacionContinuar: true
+            }
+          };
+        }
+
         const pasos = generarPasosEtapa6();
-        
+
         await ejecutarPasosAutomaticamente(pasos.pasos || []);
-        
+
         const pasosParaAgente = (pasos.pasos || []).filter(p => p.tipo === 'hablar');
-        
+
         return {
           ok: true,
           pasos: pasosParaAgente,
@@ -2778,6 +2933,11 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
   if (!preferencia) {
     return { ok: false, error: 'No se pudo interpretar la preferencia del paciente' };
   }
+
+  const snapCara = estado.valorActual;
+  const snapOtro = estado.valorAnterior;
+  const valorElegidoReanclajeSnap =
+    preferencia === 'actual' ? snapCara : preferencia === 'anterior' ? snapOtro : snapCara;
   
   console.log(`📊 Procesando respuesta comparación (${estado.ojo}):`, {
     respuestaPaciente,
@@ -2799,7 +2959,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
       estado.faseComparacion = 'mostrando_alternativo';
       
       // Generar pasos para mostrar valorMenos
-      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMenos };
+      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMenos, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
       
     } else if (estado.valorActual === estado.valorMenos) {
       // Estaba mostrando -salto, eligió base (segunda confirmación)
@@ -2827,7 +2987,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
         
         // Si aún no hay 2 confirmaciones, mostrar base para confirmar
         estado.faseComparacion = 'mostrando_alternativo';
-        return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase };
+        return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
       } else if (estado.valorAnterior === estado.valorMenos) {
         // El anterior era -salto, confirmar -salto
         estado.valorConfirmado = estado.valorMenos;
@@ -2842,7 +3002,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
         
         // Si aún no hay 2 confirmaciones, mostrar base para confirmar
         estado.faseComparacion = 'mostrando_alternativo';
-        return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase };
+        return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
       }
     }
     
@@ -2856,7 +3016,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
       estado.faseComparacion = 'mostrando_alternativo';
       
       // Generar pasos para mostrar base (confirmar)
-      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase };
+      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
       
     } else if (estado.valorActual === estado.valorMenos) {
       // Estaba mostrando -salto, eligió -salto
@@ -2866,7 +3026,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
       estado.faseComparacion = 'mostrando_alternativo';
       
       // Generar pasos para mostrar base (confirmar)
-      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase };
+      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
       
     } else if (estado.valorActual === estado.valorBase) {
       // Estaba mostrando base, eligió base (confirmación)
@@ -2881,12 +3041,12 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
         estado.faseComparacion = 'mostrando_alternativo';
         // Mostrar el alternativo que no probamos aún
         if (!estado.valoresProbados.mas) {
-          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMas };
+          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMas, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
         } else if (!estado.valoresProbados.menos) {
-          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMenos };
+          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorMenos, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
         } else {
           // Ya probamos ambos, volver a mostrar base
-          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase };
+          return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorBase, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
         }
       }
     }
@@ -2897,7 +3057,7 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
     if (estado.confirmaciones === 0) {
       // Primera vez que dice igual, reintentar
       estado.faseComparacion = 'mostrando_alternativo';
-      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorActual };
+      return { ok: true, necesitaMostrarLente: true, valorAMostrar: estado.valorActual, valorElegidoReanclaje: valorElegidoReanclajeSnap, preferenciaAplicada: preferencia };
     } else {
       // Ya dijo igual antes, usar el valor más pequeño
       const valores = [estado.valorMas, estado.valorBase, estado.valorMenos].filter(v => v !== null);
@@ -3447,7 +3607,12 @@ function procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion
     estado.rxVariante = aplicarVarianteCilindrica(estado.rxBasePaso);
     estado.paso = 'cilindro';
     estado.faseBinocular = FB_CIL_MOSTRAR;
-    return { ok: true, necesitaMostrarLente: true };
+    return {
+      ok: true,
+      necesitaMostrarLente: true,
+      postComparacionTrasEsfera: true,
+      reanclajeRxBinocularIntermedio: preferencia === 'anterior'
+    };
   }
 
   return confirmarResultadoBinocular(estado.rxActiva);
