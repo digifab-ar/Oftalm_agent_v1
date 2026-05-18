@@ -31,6 +31,8 @@ Para documentación completa del sistema, ver:
 - Start the server with `npm run dev`
 - Open your browser to [http://localhost:3000](http://localhost:3000). It should default to the `chatSupervisor` Agent Config.
 
+**Realtime API:** este frontend usa la API **GA** (`/v1/realtime/client_secrets`) con `@openai/agents` ≥ 0.11. La forma beta ya no es compatible. Ver [PLAN_MIGRACION_REALTIME_BETA_GA.md](./PLAN_MIGRACION_REALTIME_BETA_GA.md).
+
 ### Backend
 
 El backend está desplegado en Railway:
@@ -204,7 +206,7 @@ sequenceDiagram
     Note over WebClient: User navigates to ?agentConfig=customerServiceRetail
     User->>WebClient: Open Page
     WebClient->>NextAPI: GET /api/session
-    NextAPI->>RealtimeAPI: POST /v1/realtime/sessions
+    NextAPI->>RealtimeAPI: POST /v1/realtime/client_secrets
     RealtimeAPI->>NextAPI: Returns ephemeral session
     NextAPI->>WebClient: Returns ephemeral token (JSON)
 

@@ -50,11 +50,11 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
         historyHandlers.handleTranscriptionCompleted(event);
         break;
       }
-      case "response.audio_transcript.done": {
+      case "response.output_audio_transcript.done": {
         historyHandlers.handleTranscriptionCompleted(event);
         break;
       }
-      case "response.audio_transcript.delta": {
+      case "response.output_audio_transcript.delta": {
         historyHandlers.handleTranscriptionDelta(event);
         break;
       }
@@ -136,8 +136,12 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
         }),
         model: 'gpt-realtime-mini-2025-12-15',
         config: {
-          inputAudioTranscription: {
-            model: 'gpt-4o-mini-transcribe',
+          audio: {
+            input: {
+              transcription: {
+                model: 'gpt-4o-mini-transcribe',
+              },
+            },
           },
         },
         outputGuardrails: outputGuardrails ?? [],
