@@ -1797,10 +1797,7 @@ function generarPasosSoloForopteroComparacion(ojo, tipoTest, valorParametro) {
       [otro]: { occlusion: 'close' }
     };
   } else if (tipoTest === 'cilindrico') {
-    const esferaFinal =
-      estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino ||
-      estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso ||
-      estadoExamen.valoresRecalculados[ojo].esfera;
+    const { esfera: esferaFinal } = calcularValoresFinalesForoptero(ojo);
     configForoptero = {
       [ojo]: {
         esfera: esferaFinal,
@@ -1811,13 +1808,7 @@ function generarPasosSoloForopteroComparacion(ojo, tipoTest, valorParametro) {
       [otro]: { occlusion: 'close' }
     };
   } else if (tipoTest === 'cilindrico_angulo') {
-    const esferaFinal =
-      estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino ||
-      estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso ||
-      estadoExamen.valoresRecalculados[ojo].esfera;
-    const cilindroFinal =
-      estadoExamen.secuenciaExamen.resultados[ojo].cilindrico ||
-      estadoExamen.valoresRecalculados[ojo].cilindro;
+    const { esfera: esferaFinal, cilindro: cilindroFinal } = calcularValoresFinalesForoptero(ojo);
     configForoptero = {
       [ojo]: {
         esfera: esferaFinal,
@@ -2669,10 +2660,7 @@ function generarPasosMostrarLente(ojo, valorEsfera, letra, logmar) {
 function generarPasosMostrarLenteCilindrico(ojo, valorCilindro, letra, logmar) {
   const pasos = [];
   
-  // Obtener valores actuales del foróptero (usar resultados de tests anteriores si existen)
-  const esferaFinal = estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino 
-    || estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso 
-    || estadoExamen.valoresRecalculados[ojo].esfera;
+  const { esfera: esferaFinal } = calcularValoresFinalesForoptero(ojo);
   
   // 1. Configurar foróptero con el nuevo valor de cilindro
   const configForoptero = {
@@ -2723,14 +2711,7 @@ function generarPasosMostrarLenteCilindrico(ojo, valorCilindro, letra, logmar) {
 function generarPasosMostrarLenteCilindricoAngulo(ojo, valorAngulo, letra, logmar) {
   const pasos = [];
   
-  // Obtener valores actuales del foróptero (usar resultados de tests anteriores si existen)
-  const esferaFinal = estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino 
-    || estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso 
-    || estadoExamen.valoresRecalculados[ojo].esfera;
-  
-  // Usar el resultado del test de cilindro si existe, sino el valor recalculado
-  const cilindroFinal = estadoExamen.secuenciaExamen.resultados[ojo].cilindrico 
-    || estadoExamen.valoresRecalculados[ojo].cilindro;
+  const { esfera: esferaFinal, cilindro: cilindroFinal } = calcularValoresFinalesForoptero(ojo);
   
   // 1. Configurar foróptero con el nuevo valor de ángulo
   const configForoptero = {
@@ -3266,11 +3247,7 @@ function confirmarResultado(valorFinal) {
     estadoExamen.secuenciaExamen.resultados[ojo].cilindrico = valorFinal;
     console.log(`✅ Resultado confirmado para ${ojo} (cilíndrico): ${valorFinal}`);
     
-    // Actualizar el foróptero con el nuevo valor de cilindro
-    // Obtener valores actuales del foróptero (usar resultados de tests anteriores si existen)
-    const esferaFinal = estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino 
-      || estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso 
-      || estadoExamen.valoresRecalculados[ojo].esfera;
+    const { esfera: esferaFinal } = calcularValoresFinalesForoptero(ojo);
     
     // Actualizar foróptero con el nuevo cilindro confirmado
     if (ejecutarComandoForopteroInterno) {
@@ -3297,15 +3274,7 @@ function confirmarResultado(valorFinal) {
     estadoExamen.secuenciaExamen.resultados[ojo].cilindricoAngulo = valorFinal;
     console.log(`✅ Resultado confirmado para ${ojo} (cilíndrico ángulo): ${valorFinal}°`);
     
-    // Actualizar el foróptero con el nuevo valor de ángulo
-    // Obtener valores actuales del foróptero (usar resultados de tests anteriores si existen)
-    const esferaFinal = estadoExamen.secuenciaExamen.resultados[ojo].esfericoFino 
-      || estadoExamen.secuenciaExamen.resultados[ojo].esfericoGrueso 
-      || estadoExamen.valoresRecalculados[ojo].esfera;
-    
-    // Usar el resultado del test de cilindro si existe, sino el valor recalculado
-    const cilindroFinal = estadoExamen.secuenciaExamen.resultados[ojo].cilindrico 
-      || estadoExamen.valoresRecalculados[ojo].cilindro;
+    const { esfera: esferaFinal, cilindro: cilindroFinal } = calcularValoresFinalesForoptero(ojo);
     
     // Actualizar foróptero con el nuevo ángulo confirmado
     if (ejecutarComandoForopteroInterno) {
