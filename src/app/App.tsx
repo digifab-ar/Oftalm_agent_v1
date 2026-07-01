@@ -236,6 +236,7 @@ function App() {
           initialAgents: reorderedAgents,
           audioElement: sdkAudioElement,
           outputGuardrails: [guardrail],
+          enablePostComparacionAutoChain: agentSetKey === 'chatSupervisor',
           extraContext: {
             addTranscriptBreadcrumb,
           },

@@ -1975,7 +1975,8 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
             contexto: {
               etapa: estadoExamen.etapa,
               testActual: estadoExamen.secuenciaExamen.testActual,
-              postComparacionContinuar: true
+              postComparacionContinuar: true,
+              requiereRespuestaPaciente: false
             }
           };
         }
@@ -2068,7 +2069,8 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
             contexto: {
               etapa: estadoExamen.etapa,
               testActual,
-              postComparacionContinuar: true
+              postComparacionContinuar: true,
+              requiereRespuestaPaciente: false
             }
           };
         }
@@ -2166,7 +2168,8 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
                 etapa: 'ETAPA_6',
                 testActual: estadoExamen.secuenciaExamen.testActual,
                 binocularEstado: contextoBinocularResumido(estadoExamen.binocularEstado),
-                postComparacionContinuar: true
+                postComparacionContinuar: true,
+                requiereRespuestaPaciente: false
               }
             };
           }

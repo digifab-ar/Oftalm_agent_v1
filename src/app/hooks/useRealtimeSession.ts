@@ -6,6 +6,7 @@ import {
 } from '@openai/agents/realtime';
 
 import { applyCodecPreferences } from '../lib/codecUtils';
+import { attachPostComparacionContinuarHandlers } from '../lib/postComparacionContinuar';
 import { useEvent } from '../contexts/EventContext';
 import { useHandleSessionHistory } from './useHandleSessionHistory';
 import { SessionStatus } from '../types';
@@ -21,10 +22,13 @@ export interface ConnectOptions {
   audioElement?: HTMLAudioElement;
   extraContext?: Record<string, any>;
   outputGuardrails?: any[];
+  /** Punto 1 — auto-encadenar obtenerEtapa({}) tras TTS de Sigamos (chatSupervisor). */
+  enablePostComparacionAutoChain?: boolean;
 }
 
 export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
   const sessionRef = useRef<RealtimeSession | null>(null);
+  const postComparacionCleanupRef = useRef<(() => void) | null>(null);
   const [status, setStatus] = useState<
     SessionStatus
   >('DISCONNECTED');
@@ -117,6 +121,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
       audioElement,
       extraContext,
       outputGuardrails,
+      enablePostComparacionAutoChain = false,
     }: ConnectOptions) => {
       if (sessionRef.current) return; // already connected
 
@@ -149,12 +154,23 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
       });
 
       await sessionRef.current.connect({ apiKey: ek });
+
+      if (enablePostComparacionAutoChain) {
+        postComparacionCleanupRef.current?.();
+        postComparacionCleanupRef.current = attachPostComparacionContinuarHandlers(
+          sessionRef.current,
+          logClientEvent,
+        );
+      }
+
       updateStatus('CONNECTED');
     },
-    [callbacks, updateStatus],
+    [callbacks, updateStatus, logClientEvent],
   );
 
   const disconnect = useCallback(() => {
+    postComparacionCleanupRef.current?.();
+    postComparacionCleanupRef.current = null;
     sessionRef.current?.close();
     sessionRef.current = null;
     updateStatus('DISCONNECTED');

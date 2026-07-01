@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { isPostComparacionContinuarNudge } from "@/app/lib/postComparacionContinuar";
 import { useTranscript } from "@/app/contexts/TranscriptContext";
 import { useEvent } from "@/app/contexts/EventContext";
 
@@ -106,6 +107,8 @@ export function useHandleSessionHistory() {
       if (guardrailMessage) {
         const failureDetails = JSON.parse(guardrailMessage);
         addTranscriptBreadcrumb('Output Guardrail Active', { details: failureDetails });
+      } else if (isUser && isPostComparacionContinuarNudge(text)) {
+        addTranscriptBreadcrumb('auto_chain: postComparacionContinuar', {});
       } else {
         addTranscriptMessage(itemId, role, text);
       }

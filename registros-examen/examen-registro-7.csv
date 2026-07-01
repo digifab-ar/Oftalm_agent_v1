@@ -1,0 +1,71 @@
+﻿exportado_en,2026-07-01 14:59:25
+zona_horaria,America/Argentina/Buenos_Aires
+etapa_actual,ETAPA_5
+modo_examen,normal
+Valores iniciales,"<R> +0.50, -1.50, 150 / <L> +0.50, -1.50, 20"
+Valores recalculados,"<R> +0.50 , -1.00 , 150 / <L> +0.50 , -1.00 , 20"
+Timestamp,Origen,Detalle
+2026-07-01 14:55:42,Oftalmologo,"Perfecto, vamos a reiniciar el examen. Escribí los valores del autorefractómetro. Ejemplo: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0"
+2026-07-01 14:55:43,Oftalmologo,"Hola, escribí los valores del autorefractómetro antes de iniciar el test. Ejemplo de formato: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0"
+2026-07-01 14:56:09,Paciente,"<R> +0.50, -1.50, 150 / <L> +0.50, -1.50, 20"
+2026-07-01 14:56:09,Foroptero-TV,<R> Esf +0.50 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:56:11,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:56:11,Oftalmologo,"Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes y luego decime si ves bien."
+2026-07-01 14:56:34,Paciente,Veo bien
+2026-07-01 14:56:34,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":null}"
+2026-07-01 14:56:34,Foroptero-TV,<R> Esf +1.00 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:56:43,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:56:44,Oftalmologo,Ahora te voy a mostrar otro lente y me vas a decir si ves mejor o peor
+2026-07-01 14:56:44,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:56:56,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:57:08,Paciente,con el anterior
+2026-07-01 14:57:08,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-01 14:57:08,Foroptero-TV,<R> Esf +0.50 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:57:20,Oftalmologo,Sigamos con este.
+2026-07-01 14:57:28,Foroptero-TV,<R> Esf +0.00 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:57:38,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:57:38,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:57:44,Paciente,Veo mejor con este
+2026-07-01 14:57:44,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""actual"",""confianza"":null}"
+2026-07-01 14:57:44,Foroptero-TV,<R> Esf +0.50 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:57:53,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:57:54,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:57:59,Paciente,Con el anterior
+2026-07-01 14:57:59,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-01 14:57:59,Foroptero-TV,<R> Esf +0.00 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:58:03,Oftalmologo,Sigamos con este.
+2026-07-01 14:58:09,Foroptero-TV,<R> Esf +0.25 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:58:10,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:58:10,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:58:17,Paciente,Con el anterior
+2026-07-01 14:58:17,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-01 14:58:17,Foroptero-TV,<R> Esf +0.00 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:58:26,Oftalmologo,Sigamos con este.
+2026-07-01 14:58:30,Foroptero-TV,<R> Esf -0.25 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:58:35,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:58:36,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:58:41,Paciente,Con el anterior
+2026-07-01 14:58:41,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-01 14:58:41,Foroptero-TV,<R> Esf +0.00 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:58:50,Oftalmologo,Sigamos con este.
+2026-07-01 14:58:57,Foroptero-TV,<R> Esf +0.50 / Cil -0.50 / @150° / (open); <L> (close)
+2026-07-01 14:59:10,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-01 14:59:10,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-01 14:59:16,Paciente,Con el anterior
+2026-07-01 14:59:16,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-01 14:59:16,Foroptero-TV,<R> Esf +0.50 / Cil -1.00 / @150° / (open); <L> (close)
+2026-07-01 14:59:23,Oftalmologo,Sigamos con este.
+Test,Valor
+Agudeza inicial (R),0.3
+Esférico Grueso (R),0
+Esférico Fino (R),0
+Cilíndrico (R),pendiente
+Cilíndrico ángulo (R),pendiente
+Agudeza alcanzada (R),pendiente
+Agudeza inicial (L),pendiente
+Esférico Grueso (L),pendiente
+Esférico Fino (L),pendiente
+Cilíndrico (L),pendiente
+Cilíndrico ángulo (L),pendiente
+Agudeza alcanzada (L),pendiente
+Binocular (B),pendiente
