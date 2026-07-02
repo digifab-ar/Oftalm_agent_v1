@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const REALTIME_MODEL = "gpt-realtime-mini-2025-12-15";
-const TRUNCATION_POST_INSTRUCTIONS = 6000;
+const TRUNCATION_POST_INSTRUCTIONS = 4500;
 const TRUNCATION_RETENTION_RATIO = 0.8;
 
 export async function GET() {
