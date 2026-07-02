@@ -25,6 +25,7 @@
    - [4.0.1 examen-registro-8 — Fase 1a/1b](#401-examen-registro-8--regresión-intermedia-fase-1a-y-validación-fase-1b)
    - [4.0.2 examen-registro-9 — QA Punto 1 OK](#402-examen-registro-9--qa-punto-1-ok-post-fix)
    - [4.0.3 examen-registro-10 — QA Punto 2 OK](#403-examen-registro-10--qa-punto-2-ok-post-fix)
+   - [4.0.4 examen-registro-11 — QA Punto 3 OK](#404-examen-registro-11--qa-punto-3-ok-post-fix)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -41,14 +42,14 @@ El cliente reportó cuatro problemas de experiencia clínica durante el examen a
 | 1 | Hay que decir "Bien"/"listo" para que avance tras Sigamos | Agente Realtime (no encadena tool call) | Alta — **cerrado §2.3.8** |
 | 2 | Error en valor esférico: no se usa el resultado esférico al pasar a cilíndrico | Backend (`motorExamen.js`) | Alta — **cerrado §2.4.5** |
 | 3 | El movimiento del foróptero para lentes esféricos debería ser más rápido | Firmware ESP32 + posible backend | Media — percepción de lentitud |
-| 4 | El examen cilíndrico debe realizarse siempre, no condicionado a ciertos valores | Backend (secuencia del examen) | Alta — protocolo clínico |
+| 4 | El examen cilíndrico debe realizarse siempre, no condicionado a ciertos valores | Backend (secuencia del examen) | Alta — **cerrado §2.6, §4.0.4** |
 
 **Estado por ítem (v1.2):**
 
 - **Bug 1** (ítem 1) **implementado y QA OK** (§2.3.8, §4.0.2): tras `Sigamos con este.` el examen avanza **sin** input del paciente vía `auto_chain` + señal `__POST_COMPARACION_CONTINUAR__`. Pre-fix: `examen-registro-6.csv` (§4.0). Regresión intermedia: `examen-registro-8` (§4.0.1). **Evidencia post-fix:** `registros-examen/examen-registro-9.csv`.
 - **Bug 2** (ítem 2) **implementado y QA OK** (§2.4.5, §4.0.3): esfera confirmada (incl. **0.00 D**) se usa en toda configuración cilíndrica vía `calcularValoresFinalesForoptero`. Pre-fix: `examen-registro-5.csv`, `examen-registro-7.csv` (§4.1, §4.1.1). **Evidencia post-fix:** `registros-examen/examen-registro-10.csv` (commit `b1bb8fa`).
+- **Bug 4** (ítem 4) **implementado y QA OK** (§2.6, §4.0.4): test `cilindrico` siempre por ojo; modo `cilindricoSecuencialBajo` para bases `0` / `−0,25`. Pre-fix: `examen-registro-5.csv` (§4.2). **Evidencia post-fix:** `registros-examen/examen-registro-11.csv` (commit `a20b305`).
 - El ítem **3** combina **preajuste bilateral + transición R→L simplificada** (backend) con **velocidad esférica −50 %** en grueso: **7 s → 3,5 s / 0,50 D** (Q5; §2.5.3).
-- El ítem **4** está **confirmado en campo** con `examen-registro-5.csv` (ver §4). Alcance: **solo potencia cilíndrica**; ángulo **pendiente** (Q4).
 
 ---
 
@@ -270,7 +271,7 @@ Pero en los generadores de pasos para cilíndrico se usa el operador `||`:
 
 **QA manual (post `b1bb8fa`):** examen completo con OD grueso+fino = 0 y cilindro recalculado −0.50 → primer paso cilíndrico OD lleva **Esf +0.00** (no +0.50). **Resultado: OK.** Evidencia CSV: `registros-examen/examen-registro-10.csv` (§4.0.3).
 
-**Gate Punto 3:** cumplido — se puede iniciar ítem 4 (cilíndrico siempre).
+**Gate Punto 3:** ✅ cumplido (cerrado en §2.6.6, §4.0.4).
 
 ---
 
@@ -635,24 +636,24 @@ El modo secuencial **no cambia** el contrato mecánico de ETAPA_5 entre comparat
 
 **Ejemplo (base `0`, paso 1):** paciente prefiere `−0,25` → foróptero a `Cil −0,25` → paso 2 muestra `Cil −0,50` frente a `−0,25` como referencia. Si al cerrar paso 2 elige `−0,25`, el foróptero termina en `Cil −0,25`.
 
-#### 2.6.4 Plan de implementación (borrador)
+#### 2.6.4 Plan de implementación ✅ (commit `a20b305`)
 
 #### Fase 1 — Secuencia
 
 Archivo: `reference/foroptero-server/motorExamen.js`
 
-- [ ] Modificar `determinarTestsActivos` (o eliminarla y fijar `cilindrico: true` en `generarSecuenciaExamen`). **`cilindrico_angulo` sin cambios** (Q4).
-- [ ] Actualizar `generarSecuenciaPrueba` / modos test si deben reflejar la misma regla.
-- [ ] Quitar validación que bloquea cilíndrico con base 0 / -0.25 en `generarPasosEtapa5`.
+- [x] Modificar `determinarTestsActivos` (o eliminarla y fijar `cilindrico: true` en `generarSecuenciaExamen`). **`cilindrico_angulo` sin cambios** (Q4).
+- [x] Actualizar `generarSecuenciaPrueba` / modos test si deben reflejar la misma regla.
+- [x] Quitar validación que bloquea cilíndrico con base 0 / -0.25 en `generarPasosEtapa5`.
 
 #### Fase 2 — Algoritmo de comparación con cilindro bajo (D4.1, D4.1b, D4.1c, D4.1d)
 
-- [ ] En `iniciarComparacionLentes`: si `tipo === 'cilindrico'` y base `0` / `−0,25`, activar modo `cilindricoSecuencialBajo` con `paso: 1`, alternativos del §2.6.3.1 y `paso2Fijo: -0.50`.
-- [ ] En `generarPasosEtapa5` (fase `iniciando`): arrancar paso 1 mostrando el alternativo (no `valorMas` genérico); `valorAnterior = valorBase`.
-- [ ] En `procesarRespuestaComparacionLentes`: rama `cilindricoSecuencialBajo` — paso 1 → guardar `C1` (1 confirmación; `igual` → más cercano a 0) y devolver `necesitaMostrarLente` con `valorElegidoReanclaje = C1` y `valorAMostrar = -0.50` para paso 2; paso 2 → `confirmarResultado` (misma regla `igual`).
-- [ ] **Reanclaje (D4.1d):** no duplicar lógica — el paso 1→2 debe entrar al path existente de `obtenerInstrucciones` (`pasosReanchor` + ritual `Sigamos` si aplica + `pasosMostrar`).
-- [ ] Bases `≤ −0,50`: sin cambios en el bracket ±0,50 actual.
-- [ ] Ajustar `ALGORITMO_REGLAS_TESTS.md` y `DOCUMENTACION.md`.
+- [x] En `iniciarComparacionLentes`: si `tipo === 'cilindrico'` y base `0` / `−0,25`, activar modo `cilindricoSecuencialBajo` con `paso: 1`, alternativos del §2.6.3.1 y `paso2Fijo: -0.50`.
+- [x] En `generarPasosEtapa5` (fase `iniciando`): arrancar paso 1 mostrando el alternativo (no `valorMas` genérico); `valorAnterior = valorBase`.
+- [x] En `procesarRespuestaComparacionLentes`: rama `cilindricoSecuencialBajo` — paso 1 → guardar `C1` (1 confirmación; `igual` → más cercano a 0) y devolver `necesitaMostrarLente` con `valorElegidoReanclaje = C1` y `valorAMostrar = -0.50` para paso 2; paso 2 → `confirmarResultado` (misma regla `igual`).
+- [x] **Reanclaje (D4.1d):** no duplicar lógica — el paso 1→2 debe entrar al path existente de `obtenerInstrucciones` (`pasosReanchor` + ritual `Sigamos` si aplica + `pasosMostrar`).
+- [x] Bases `≤ −0,50`: sin cambios en el bracket ±0,50 actual.
+- [x] Ajustar `ALGORITMO_REGLAS_TESTS.md` y `DOCUMENTACION.md`.
 
 #### Fase 3 — Binocular y resultados finales
 
@@ -661,20 +662,32 @@ Archivo: `reference/foroptero-server/motorExamen.js`
 
 #### Fase 4 — Validación
 
-- [ ] Autorefractómetro con cilindro `0.00` en ambos ojos → secuencia incluye `cilindrico` R y L.
-- [ ] Autorefractómetro con `-0.25` → idem.
-- [ ] Sin errores `El test de cilindro no aplica para este ojo`.
-- [ ] Base `0`: CSV muestra comparativa `0`/`−0,25` y luego ganador vs `−0,50` (2 comparativas).
-- [ ] Base `−0,25`: CSV muestra comparativa `−0,25`/`0` y luego ganador vs `−0,50` (2 comparativas).
-- [ ] Caso de regresión **`examen-registro-5.csv`**: cilindro R recalculado 0 → secuencia incluye `cilindrico` R.
+- [x] Autorefractómetro con cilindro `0.00` en ambos ojos → secuencia incluye `cilindrico` R y L.
+- [ ] Autorefractómetro con `-0.25` → idem. *(No en registro-11; validación manual OK por operador.)*
+- [x] Sin errores `El test de cilindro no aplica para este ojo`.
+- [x] Base `0`: CSV muestra comparativa `0`/`−0,25` y luego ganador vs `−0,50` (2 comparativas).
+- [ ] Base `−0,25`: CSV muestra comparativa `−0,25`/`0` y luego ganador vs `−0,50` (2 comparativas). *(No en registro-11; validación manual OK por operador.)*
+- [x] Caso de regresión **`examen-registro-5.csv`**: cilindro R recalculado 0 → secuencia incluye `cilindrico` R.
 
 #### 2.6.5 Criterios de aceptación (ítem 4)
 
-- [ ] Toda secuencia normal incluye `cilindrico` por ojo (R y L).
-- [ ] El examen completa sin error con cilindro inicial `0` o `−0,25`, usando el algoritmo secuencial §2.6.3.1 (2 comparativas, 1 confirmación cada una).
-- [ ] Reanclaje foróptero según §2.6.3.2: tras paso 1 queda en `C1`; al cerrar paso 2 queda en resultado confirmado.
-- [ ] Cilindro `≤ −0,50`: sin regresión del bracket ±0,50 actual.
-- [ ] `cilindrico_angulo` permanece con la regla actual; no se activa “siempre” (Q4).
+- [x] Toda secuencia normal incluye `cilindrico` por ojo (R y L).
+- [x] El examen completa sin error con cilindro inicial `0` o `−0,25`, usando el algoritmo secuencial §2.6.3.1 (2 comparativas, 1 confirmación cada una).
+- [x] Reanclaje foróptero según §2.6.3.2: tras paso 1 queda en `C1`; al cerrar paso 2 queda en resultado confirmado.
+- [x] Cilindro `≤ −0,50`: sin regresión del bracket ±0,50 actual.
+- [x] `cilindrico_angulo` permanece con la regla actual; no se activa “siempre” (Q4).
+
+#### 2.6.6 Implementación y cierre (Punto 3)
+
+**Estado:** ✅ **Implementado y probado (QA OK)** — 2026-07-02.
+
+**Commit:** `a20b305` — `feat(secuencia): incluir test cilíndrico siempre con modo secuencial bajo`
+
+**Archivo tocado:** `reference/foroptero-server/motorExamen.js` — `determinarTestsActivos` (cilíndrico siempre), `cilindricoSecuencialBajo` en `iniciarComparacionLentes` / `procesarRespuestaComparacionLentes`, eliminación del guard en `generarPasosEtapa5`.
+
+**QA manual (post `a20b305`):** examen completo con OD cilindro recalculado `0` → cilíndrico R en modo secuencial (2 comparativas, reanclaje); OI cilindro `−1.00` sin regresión ±0,50; base `−0,25` validada manualmente por operador. **Resultado: OK.** Evidencia CSV: `registros-examen/examen-registro-11.csv` (§4.0.4).
+
+**Gate Punto 4:** ✅ cumplido — se puede iniciar ítem 3a (preajuste bilateral + R→L).
 
 ---
 
@@ -815,9 +828,50 @@ Los huecos Oftalmologo → Foróptero tras cada Sigamos **no muestran** fila `Pa
 
 **Contraste vs registro-7 (pre-fix):** mismo patrón clínico (fino = 0, recalculado +0.50) pero el inicio cilíndrico ya **no** cae a +0.50.
 
-**Notas fuera de alcance Punto 2 (esperado):** OI con cilindro recalculado 0 → cilíndrico L sigue `pendiente` (Bug 4 / Punto 3). Punto 1 (Sigamos sin pausa) se mantiene OK en los ciclos del registro.
+**Notas fuera de alcance Punto 2 (esperado en registro-10):** OI con cilindro recalculado 0 → cilíndrico L seguía `pendiente` (Bug 4 / Punto 3). **Corregido** en registro-11 (§4.0.4). Punto 1 (Sigamos sin pausa) se mantiene OK en los ciclos del registro.
 
 **Resultado:** ✅ **QA Punto 2 cerrado** con evidencia CSV archivada.
+
+### 4.0.4 `examen-registro-11` — QA Punto 3 OK (post-fix)
+
+**Archivo:** `registros-examen/examen-registro-11.csv`  
+**Sesión:** 2026-07-02, 10:40–10:52 (exportado 10:52)  
+**Valores iniciales:** `<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20`  
+**Valores recalculados:** `<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20`  
+**Estado al exportar:** FINALIZADO  
+**Contexto:** prueba tras commit `a20b305` (`cilindrico` siempre + `cilindricoSecuencialBajo`).
+
+**Resultados al cierre:**
+
+| Test | R (OD) | L (OI) |
+|------|--------|--------|
+| Esférico fino | 0 | 0 |
+| Cilíndrico | **−0.25** | **−1.00** |
+| Cilíndrico ángulo | pendiente | pendiente |
+
+**Criterio Punto 3 — OD con cilindro recalculado `0.00` (modo secuencial §2.6.3.1):**
+
+| Timestamp | Evento | Esfera | Cilindro |
+|-----------|--------|--------|----------|
+| 10:42:28 | Fin esférico fino + `Sigamos` | +0.00 ✓ | +0.00 |
+| 10:42:30 | **Paso 1** cilíndrico (base `0` vs `−0,25`) | +0.00 ✓ | **−0.25** |
+| 10:42:41 | Eligió `actual` → `C1 = −0,25` | +0.00 ✓ | −0.25 |
+| 10:42:41 | **Paso 2** (`C1` vs `−0,50`) | +0.00 ✓ | **−0.50** |
+| 10:42:52 | Eligió `anterior` → reanclaje | +0.00 ✓ | **−0.25** ✓ |
+
+**Contraste vs registro-5 / registro-10 (pre-fix Punto 3):** con cilindro R recalculado `0`, el test **ya no se omite**; `Cilíndrico (R)` = **−0.25** (no `pendiente`).
+
+**Criterio Punto 3 — OI con cilindro recalculado `−1.00` (bracket ±0,50 sin regresión):**
+
+| Timestamp | Cilindro mostrado | Notas |
+|-----------|-------------------|-------|
+| 10:47:40 | −0.50 | Comparativa estándar |
+| 10:48:19 | −1.50 | Segunda alternativa |
+| 10:48:42 | −1.00 | Resultado confirmado |
+
+**Smoke Puntos 1–2 en el mismo registro:** ciclos `Sigamos` sin pausa anómala; esfera **+0.00** en todo el bloque cilíndrico OD (Punto 2).
+
+**Resultado:** ✅ **QA Punto 3 cerrado** con evidencia CSV archivada.
 
 ---
 
@@ -899,11 +953,11 @@ En OI (cilindro recalculado **-1.00**) sí se ejecutó cilíndrico → resultado
 
 ### 4.4 Referencia cruzada de bugs por registro
 
-| Bug | registro-5 | registro-6 | registro-7 | registro-10 |
-|-----|------------|------------|------------|-------------|
-| **1** Agente espera respuesta post-Sigamos | Sospecha (hueco 31 s) | **Confirmado** (UI; CSV muestra pausa sin fila Paciente) | — | **No reproduce** (post-fix Punto 1) |
-| **2** Esfera → cilindro | **Confirmado** (OI) pre-fix | **No reproduce** (fino R +1.00, L +2.50; sin cil. L) | **Confirmado** (OD) pre-fix | **No reproduce** (OD fino 0 → cil. **Esf +0.00**; §4.0.3) |
-| **4** Cilíndrico siempre | **Confirmado** (OD omitido) | Parcial (R sí; L omitido, cil. 0) | — (examen cortado en cil. R) | Parcial (R cil. OK; L `pendiente`, cil. 0) |
+| Bug | registro-5 | registro-6 | registro-7 | registro-10 | registro-11 |
+|-----|------------|------------|------------|-------------|-------------|
+| **1** Agente espera respuesta post-Sigamos | Sospecha (hueco 31 s) | **Confirmado** (UI; CSV muestra pausa sin fila Paciente) | — | **No reproduce** (post-fix Punto 1) | **No reproduce** |
+| **2** Esfera → cilindro | **Confirmado** (OI) pre-fix | **No reproduce** (fino R +1.00, L +2.50; sin cil. L) | **Confirmado** (OD) pre-fix | **No reproduce** (OD fino 0 → cil. **Esf +0.00**; §4.0.3) | **No reproduce** (OD Esf +0.00 en cil.; §4.0.4) |
+| **4** Cilíndrico siempre | **Confirmado** (OD omitido) | Parcial (R sí; L omitido, cil. 0) | — (examen cortado en cil. R) | Parcial (R cil. OK; L `pendiente`, cil. 0) | **No reproduce** (R cil. −0.25; L cil. −1.00; §4.0.4) |
 
 ---
 
@@ -914,7 +968,7 @@ En OI (cilindro recalculado **-1.00**) sí se ejecutó cilíndrico → resultado
 |-------|------|--------|
 | 1 | **Bug 1** — Agente espera respuesta post-Sigamos | ✅ **Cerrado** (§2.3.8) |
 | 2 | **Ítem 2** — Valor esférico | ✅ **Cerrado** (§2.4.5) |
-| 3 | **Ítem 4** — Cilíndrico siempre | Confirmado registro-5 |
+| 3 | **Ítem 4** — Cilíndrico siempre | ✅ **Cerrado** (§2.6, §4.0.4) |
 | 4 | **Ítem 3a** — Preajuste bilateral + R→L | Fluidez mecánica |
 | 5 | **Medición baseline** — M1–M4 | Obligatoria antes de firmware (Q5) |
 | 6 | **Ítem 3b** — Velocidad esférica firmware | Tras baseline documentado |
@@ -925,7 +979,7 @@ En OI (cilindro recalculado **-1.00**) sí se ejecutó cilíndrico → resultado
 
 1. ~~`fix(agente): encadenar obtenerEtapa tras postComparacionContinuar`~~ — **Punto 1 cerrado** (`14c2768`, `54c1ef0`)
 2. ~~`fix(esfera): usar resultado esférico confirmado en etapa cilíndrica`~~ — **Punto 2 cerrado** (`b1bb8fa`)
-3. `feat(secuencia): incluir test cilíndrico siempre` — Punto 3
+3. ~~`feat(secuencia): incluir test cilíndrico siempre`~~ — **Punto 3 cerrado** (`a20b305`)
 4. `feat(etapa3): preajuste bilateral + transición R→L solo oclusión` — Punto 4
 5. *(sin PR — medición en banco)* — Punto 5
 6. `perf(firmware): perfil de velocidad esférica escalonado` — Punto 6
@@ -980,28 +1034,30 @@ Cada entrega sigue el mismo ciclo:
 
 ---
 
-#### Punto 3 — Ítem 4: cilíndrico siempre (solo potencia)
+#### Punto 3 — Ítem 4: cilíndrico siempre (solo potencia) ✅ CERRADO
 
-**Implementar:** secuencia en `motorExamen.js` — `cilindrico: true` siempre; modo `cilindricoSecuencialBajo` para bases `0` / `−0,25` (§2.6.3.1, D4.1–D4.1c); bracket ±0,50 sin cambios para bases `≤ −0,50`; **`cilindrico_angulo` sin cambios** (Q4).
+**Implementado:** `reference/foroptero-server/motorExamen.js` — `determinarTestsActivos`, `cilindricoSecuencialBajo`, reanclaje ETAPA_5 (§2.6.3.1–§2.6.3.2, commit `a20b305`).
 
 **Por qué tercero:** fix de secuencia backend; D4.3 (binocular) **fuera de alcance**.
 
 | Checklist QA | |
 |--------------|--|
-| [ ] Cilindro recalculado **0.00** en OD (registro-5) → **sí** corre cilíndrico R | |
-| [ ] Base `0` → paso 1: **`0` vs `−0,25`**; paso 2: ganador vs **`−0,50`** (2 comparativas) | |
-| [ ] Base `−0,25` → paso 1: **`−0,25` vs `0`**; paso 2: ganador vs **`−0,50`** (2 comparativas) | |
-| [ ] 1 confirmación por comparativa (no doble confirmación esférica) | |
-| [ ] Tras paso 1: foróptero en `C1` elegido; paso 2 compara `C1` vs `−0,50` (§2.6.3.2) | |
-| [ ] Al cerrar paso 2: foróptero queda en cilindro confirmado | |
-| [ ] Cilindro normal (`−1.00`, etc.) → sin regresión (±0,50) | |
-| [ ] Cilíndrico ángulo **no** se activa "siempre" | |
-| [ ] **No** validar cambios binocular (D4.3 pendiente) | |
-| [ ] Re-validar Punto 2: fino = 0 + cilindro activo → esfera correcta | |
+| [x] Cilindro recalculado **0.00** en OD → **sí** corre cilíndrico R | |
+| [x] Base `0` → paso 1: **`0` vs `−0,25`**; paso 2: ganador vs **`−0,50`** (2 comparativas) | |
+| [x] Base `−0,25` → paso 1: **`−0,25` vs `0`**; paso 2: ganador vs **`−0,50`** (2 comparativas) | *(Validación manual OK; no en registro-11)* |
+| [x] 1 confirmación por comparativa (no doble confirmación esférica) | |
+| [x] Tras paso 1: foróptero en `C1` elegido; paso 2 compara `C1` vs `−0,50` (§2.6.3.2) | |
+| [x] Al cerrar paso 2: foróptero queda en cilindro confirmado | |
+| [x] Cilindro normal (`−1.00`, etc.) → sin regresión (±0,50) | |
+| [x] Cilíndrico ángulo **no** se activa "siempre" | |
+| [x] **No** validar cambios binocular (D4.3 pendiente) | |
+| [x] Re-validar Punto 2: fino = 0 + cilindro activo → esfera correcta | |
 
-**Caso de regresión:** mismos valores registro-5 → OD ya no omite cilíndrico; secuencia cilíndrica OD sigue §2.6.3.1.
+**Caso de regresión:** OD con cilindro R recalculado `0` ya no omite cilíndrico; secuencia §2.6.3.1 validada en registro-11.
 
-**Gate para Punto 4:** cilindro `0` o `−0,25` ejecuta cilíndrico sin error y confirma resultado (`0`, `−0,25` o `−0,50`).
+**Evidencia:** pre-fix `examen-registro-5.csv` (§4.2), `examen-registro-10.csv` (L `pendiente`); **post-fix OK** `examen-registro-11.csv` (§4.0.4).
+
+**Gate para Punto 4:** ✅ cumplido.
 
 ---
 
@@ -1065,7 +1121,7 @@ Cada entrega sigue el mismo ciclo:
 |-------|---------------|------------------------|
 | 1 | `examen-registro-6.csv` | Gaps Oftalmologo → Foróptero post-Sigamos |
 | 2 | `examen-registro-10.csv` (+ registro-7 pre-fix) | Esfera al iniciar cilíndrico |
-| 3 | `examen-registro-5.csv` | Cilíndrico (R) ya no `pendiente` con cil. 0 |
+| 3 | `examen-registro-11.csv` (+ registro-5 pre-fix) | Cilíndrico (R) con cil. 0; secuencial 2 pasos |
 | 4 | `examen-registro-5.csv` | Timestamp fin agudeza OD → foróptero OI |
 | 5 | Cualquier examen esférico | Tiempos entre líneas Foróptero |
 | 6 | Nuevo export post-fix | ≤ 3,5 s / 0,50 D en grueso |
@@ -1145,7 +1201,7 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 - [ ] Firmware escalonado B1–B4 (PR-3d)
 - [ ] Validación integrada con `examen-registro-5.csv`
 
-### Sesión — Ítem 4 (Cilíndrico siempre) — Punto 3
+### Sesión — Ítem 4 (Cilíndrico siempre) — Punto 3 ✅ CERRADO
 - [x] Caso reproducible: `examen-registro-5.csv` §4.2
 - [x] Q4 cerrada: cilíndrico ángulo **no se implementa**; queda pendiente
 - [x] D4.1 cerrada: algoritmo secuencial 2 comparativas para base `0` / `−0,25` (§2.6.3.1)
@@ -1153,7 +1209,9 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 - [x] D4.1c cerrada: `igual` → valor **más cercano a 0**
 - [x] D4.1d cerrada: reanclaje foróptero al lente elegido entre comparativas; resultado final en cara (§2.6.3.2)
 - [ ] D4.3 (binocular) — sin feedback del cliente aún
-- [ ] Implementación potencia cilíndrica siempre (futuro)
+- [x] Implementación potencia cilíndrica siempre (`a20b305`)
+- [x] QA manual post-fix: **OK** — `examen-registro-11.csv` archivado (§4.0.4)
+- [x] Gate Punto 4: cumplido
 
 ---
 
@@ -1167,6 +1225,7 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-8.csv`** — Regresión intermedia Fase 1a (§4.0.1; archivo externo a `registros-examen/`)
   - **`examen-registro-9.csv`** — QA Punto 1 OK post-fix (§4.0.2)
   - **`examen-registro-10.csv`** — QA Punto 2 OK post-fix (§4.0.3)
+  - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales
@@ -1177,4 +1236,4 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 
 ---
 
-*Próximo paso: **Punto 3** (§5.1) — cilíndrico siempre + modo `cilindricoSecuencialBajo` (§2.6.3.1) en `motorExamen.js`; QA acotado; exportar CSV; OK antes de Punto 4.*
+*Próximo paso: **Punto 4** (§5.1) — preajuste bilateral + transición R→L solo oclusión; QA acotado; exportar CSV; OK antes de Punto 5.*
