@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 const REALTIME_MODEL = "gpt-realtime-mini-2025-12-15";
+const TRUNCATION_POST_INSTRUCTIONS = 6000;
+const TRUNCATION_RETENTION_RATIO = 0.8;
 
 export async function GET() {
   try {
@@ -21,6 +23,13 @@ export async function GET() {
             type: "realtime",
             model: REALTIME_MODEL,
             output_modalities: ["audio"],
+            truncation: {
+              type: "retention_ratio",
+              retention_ratio: TRUNCATION_RETENTION_RATIO,
+              token_limits: {
+                post_instructions: TRUNCATION_POST_INSTRUCTIONS,
+              },
+            },
             audio: {
               input: {
                 transcription: { model: "gpt-4o-mini-transcribe" },
