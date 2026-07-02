@@ -1162,6 +1162,9 @@ function generarPasosEtapa2() {
 /**
  * Genera pasos para ETAPA_4 (solo agudeza alcanzada tras lentes)
  */
+/** Pacing TPM: pausa tras respuesta del paciente y antes de nueva letra (Fase 1b). */
+const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;
+
 function generarPasosEtapa4() {
   const testActual = estadoExamen.secuenciaExamen.testActual;
 
@@ -1377,14 +1380,19 @@ function generarPasosEtapa4() {
 
   const pasos = [
     {
-      tipo: 'tv',
+      tipo: 'esperar',
       orden: 1,
+      esperarSegundos: AGUDEZA_ESPERA_ENTRE_LETRAS_SEG
+    },
+    {
+      tipo: 'tv',
+      orden: 2,
       letra: estado.letraActual,
       logmar: estado.logmarActual
     },
     {
       tipo: 'hablar',
-      orden: 2,
+      orden: 3,
       mensaje: 'Mirá la pantalla. Decime qué letra ves.'
     }
   ];

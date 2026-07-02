@@ -1,8 +1,8 @@
 # Plan de implementación — Resiliencia ante `rate_limit_exceeded` (examen visual)
 
-**Versión:** 0.3  
+**Versión:** 0.4  
 **Fecha:** 2026-07-01  
-**Estado:** **Fase 1 definida** (truncation Variante A) — implementación pendiente  
+**Estado:** Fase 1 (truncation 6000) **implementada** — **Fase 1b (pacing 2 s)** **implementada** (pendiente deploy backend + QA)  
 **Proyecto:** `openai-realtime-agents-main-2`  
 **Relacionado con:** `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` (fluidez post-Sigamos), agente `chatSupervisor`  
 **Modelo:** `gpt-realtime-mini-2025-12-15` (límite compartido TPM con `gpt-4o-mini-realtime`: 40.000)
@@ -17,7 +17,7 @@
 4. [Causa raíz](#4-causa-raíz)
 5. [Discovery — qué expone la API sobre tokens](#5-discovery--qué-expone-la-api-sobre-tokens)
 6. [Discovery — `reset_seconds` vs tiempo real de reintento](#6-discovery--reset_seconds-vs-tiempo-real-de-reintento)
-7. [Discovery — prompt caching, truncation y costo](#7-discovery--prompt-caching-truncation-y-costo)
+7. [Discovery — prompt caching, truncation y costo](#7-discovery--prompt-caching-truncation-y-costo) (incl. [§7.8 Pacing](#78-pacing-tpm--pausas-de-2-s-fase-1b))
 8. [Enfoque recomendado](#8-enfoque-recomendado)
 9. [Arquitectura objetivo](#9-arquitectura-objetivo)
 10. [Fases de implementación](#10-fases-de-implementación)
@@ -40,15 +40,17 @@ Durante el examen visual, de forma **esporádica**, el agente Realtime queda en 
 | El backend clínico ya es stateful | Podar historial Realtime es viable sin perder estado del examen |
 | El fallo puede ser **solo TTS** tras tool exitosa | El servidor ya respondió pero el paciente no escuchó nada |
 | Workaround manual `{}` ya validado en campo | Automatizable como `obtenerEtapa({})` tras backoff, sin input del paciente |
-| **Sin `truncation` en sesión hoy** | Historial crece hasta ~8.600 `input_tokens`/turno; default servidor ~28k |
-| **`cached_tokens` alto (~99%)** | Ahorra $ pero **no reduce TPM** — el límite cuenta `input_tokens` enteros |
+| **Truncation 6000 activo** | Variante B (4500) **revertida** — pierde contexto y deja de llamar `obtenerEtapa` |
+| **Ráfaga en ETAPA_4** | Paciente → nueva letra sin pausa → muchas `response` seguidas en agudeza |
+| **Ráfaga post-Sigamos** | `audio_stopped` → `auto_chain` inmediato → TPM pico documentado (§2.4) |
 
-**Estrategia acordada:** abordar TPM en dos frentes:
+**Estrategia acordada:** abordar TPM en capas:
 
-1. **Fase 1 (preventivo):** truncation **Variante A** — `post_instructions: 6000`, `retention_ratio: 0.8`.
-2. **Fases 2–3 (reactivo + pacing):** reintento automático + throttling con `remaining`.
+1. **Fase 1 ✅** — truncation Variante A (`post_instructions: 6000`, `retention_ratio: 0.8`).
+2. **Fase 1b ⭐ (próxima)** — pacing **2 s**: backend entre letras en agudeza + cliente antes de `auto_chain`.
+3. **Fases 2–3** — reintento automático + throttling (si 1b no alcanza).
 
-**Esfuerzo orientativo:** Fase 1 (~0,5 día implementación + 1 examen QA A/B); Fases 2–3 (~1,5 días) si Fase 1 no basta.
+**Esfuerzo orientativo Fase 1b:** ~0,5 día implementación + 1 examen QA.
 
 ---
 
@@ -472,8 +474,8 @@ No se puede “limitar el cache” directamente; solo **reducir el historial** (
 | Variante | Config | TPM esperado | Riesgo clínico | Uso |
 |----------|--------|--------------|----------------|-----|
 | **Baseline** (hoy) | Sin config | ~8.600 input/turno | Ninguno | Referencia A/B |
-| **A — conservadora** ✅ | `post_instructions: 6000`, `retention_ratio: 0.8` | ~5.000–6.000 input/turno (−30–40 %) | Bajo | **Fase 1** |
-| **B — agresiva** | `post_instructions: 4500`, `retention_ratio: 0.8` | ~4.000–5.000 input/turno | Medio | Solo si A no basta |
+| **A — conservadora** ✅ | `post_instructions: 6000`, `retention_ratio: 0.8` | ~5.000–6.000 input/turno (−30–40 %) | Bajo | **Fase 1** — implementada |
+| **B — agresiva** ❌ | `post_instructions: 4500`, `retention_ratio: 0.8` | — | Alto (sin tool) | **Revertida** — ver §7.8 / Fase 1 |
 | **Disabled** | `"truncation": "disabled"` | Sin podar → error al llenar contexto | — | No recomendado |
 
 **`post_instructions`:** máximo de tokens de conversación **después** de instructions + tool definitions. No incluye el system prompt ni el schema de `obtenerEtapa`.
@@ -554,6 +556,84 @@ Ejecutar **un examen completo** con baseline (sin truncation) y otro con Variant
 | Costo $ estimado | Fórmula §7.6 × N turnos |
 | Regresión clínica | CSV + QA manual (mismas etapas, sin saltos) |
 
+### 7.8 Pacing TPM — pausas de 2 s (Fase 1b)
+
+Alternativa a truncar más: **espaciar** `response` de Realtime en el tiempo (ventana TPM deslizante) **sin podar historial**.
+
+#### Problema observado
+
+| Zona | Comportamiento actual | Efecto TPM |
+|------|----------------------|------------|
+| **ETAPA_4 — agudeza** | Paciente responde letra → `obtenerEtapa` → `necesitaNuevaLetra` → TV + `hablar` en el **mismo** HTTP → agente habla → VAD dispara otra response **al instante** | Ráfaga de turnos muy cortos; pico de tokens en agudeza |
+| **Post-Sigamos** | Servidor ya espera 3 s **dentro** del HTTP de comparación; tras TTS, `audio_stopped` → `auto_chain` **sin delay** | Segunda `response` pegada a la primera (§2.4) |
+
+#### Decisión de producto (2026-07-01)
+
+| ID | Pausa | Duración | Dónde | Fuera de alcance |
+|----|-------|----------|-------|------------------|
+| **P1** | Tras respuesta del paciente en agudeza, **antes** de mostrar otra letra | **2 s** | Backend (`motorExamen.js`) | — |
+| **P2** | Tras TTS de Sigamos, **antes** del nudge `auto_chain` | **2 s** | Cliente (`postComparacionContinuar.ts`) | — |
+| — | Gatear / silenciar VAD durante pausas | — | — | **No implementar** (acordado) |
+
+#### P1 — Agudeza: momento exacto
+
+```
+Paciente: "H"
+  → agente llama obtenerEtapa({ interpretacionAgudeza })
+    → motor: procesarRespuestaAgudeza → necesitaNuevaLetra: true
+      → [NUEVO: esperar 2 s]          ← entre procesar y mostrar letra
+      → tv (nueva letra) + hablar "Mirá la pantalla..."
+  → agente pronuncia
+  → (paciente puede responder)
+```
+
+**No** es pausa al **confirmar** agudeza (2 confirmaciones → pasar a lentes). Es pausa en el **bucle intra-test**: cada vez que hay `necesitaNuevaLetra` tras una respuesta del paciente.
+
+**Implementación prevista (backend):**
+
+| Archivo | Cambio |
+|---------|--------|
+| `reference/foroptero-server/motorExamen.js` | Constante `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` |
+| `generarPasosEtapa4()` | Insertar `{ tipo: 'esperar', esperarSegundos: 2 }` **antes** del paso `tv` en el bloque de nueva letra (líneas ~1378–1389) |
+
+Preferir **un solo punto** en `generarPasosEtapa4` al armar el array `pasos`, para que `ejecutarPasosAutomaticamente` lo respete siempre (incluye la rama `necesitaNuevaLetra` en `obtenerInstrucciones` §2246).
+
+#### P2 — Cliente post-Sigamos
+
+```
+Agente TTS "Sigamos con este."
+  → audio_stopped
+    → [NUEVO: await 2000 ms]
+    → sendMessage(__POST_COMPARACION_CONTINUAR__)
+  → obtenerEtapa({})
+```
+
+**Implementación prevista (cliente):**
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/app/lib/postComparacionContinuar.ts` | `POST_COMPARACION_CLIENT_PAUSE_MS = 2000`; `setTimeout` en `onAudioStopped` antes de `sendMessage` |
+| `src/app/hooks/useRealtimeSession.ts` | `clearTimeout` en cleanup del handler al desconectar |
+
+**Nota:** la pausa de 3 s del servidor (`POST_COMPARACION_ESPERA_SEG`) **se mantiene**; P2 es **adicional** en el cliente entre TTS y la siguiente `response`.
+
+#### Diagrama Fase 1b
+
+```
+ETAPA_4 (agudeza)                    ETAPA_5 (post-Sigamos)
+─────────────────                    ─────────────────────
+Paciente habla                       TTS "Sigamos..."
+     │                                    │
+     ▼                                    ▼
+obtenerEtapa + tool                  audio_stopped
+     │                                    │
+     ▼                                    ▼
+[esperar 2s] ← P1 backend           [esperar 2s] ← P2 cliente
+     │                                    │
+     ▼                                    ▼
+TV + nueva letra                     auto_chain nudge
+```
+
 ---
 
 ## 8. Enfoque recomendado
@@ -562,7 +642,8 @@ Ejecutar **un examen completo** con baseline (sin truncation) y otro con Variant
 
 | Capa | Nombre | Objetivo | Fase |
 |------|--------|----------|------|
-| **T** | Truncation Variante A | Reducir `input_tokens`/turno (−30–40 % TPM) | **1** ⭐ |
+| **T** | Truncation 6000 | Techo de historial sin perder tool-calling | **1** ✅ |
+| **P** | Pacing 2 s | Espaciar responses (agudeza + post-Sigamos) | **1b** ✅ |
 | **A** | Reintento reactivo | Recuperar silencios tras `rate_limit_exceeded` | 2 |
 | **B** | Throttling proactivo | Prevenir fallos con `remaining` + cola | 3 |
 | **C** | Podado manual historial | `conversation.item.delete` tool outputs viejos | 4 |
@@ -591,26 +672,48 @@ Ejecutar **un examen completo** con baseline (sin truncation) y otro con Variant
 
 ## 9. Arquitectura objetivo
 
-### 9.1 Fase 1 — cambio en sesión (inmediato)
+### 9.1 Fase 1 — truncation (implementado)
 
-```diff
-// src/app/api/session/route.ts
-  session: {
-    type: "realtime",
-    model: REALTIME_MODEL,
-    output_modalities: ["audio"],
-+   truncation: {
-+     type: "retention_ratio",
-+     retention_ratio: 0.8,
-+     token_limits: { post_instructions: 6000 },
-+   },
-    audio: { ... },
-  },
+Ver commits `91556dd`, `cf3e243`. Config activa en `src/app/api/session/route.ts`:
+
+```typescript
+const TRUNCATION_POST_INSTRUCTIONS = 6000;
+const TRUNCATION_RETENTION_RATIO = 0.8;
 ```
 
-Opcional para A/B: query param `?truncation=baseline|6000` que omita o incluya el bloque (solo para QA, no producción).
+### 9.2 Fase 1b — pacing (próximo)
 
-### 9.2 Fases 2–3 — módulo `responseScheduler.ts`
+**Backend — `motorExamen.js`:**
+
+```javascript
+const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;
+
+// En generarPasosEtapa4(), bloque nueva letra (~1378):
+const pasos = [
+  { tipo: 'esperar', orden: 1, esperarSegundos: AGUDEZA_ESPERA_ENTRE_LETRAS_SEG },
+  { tipo: 'tv', orden: 2, letra: estado.letraActual, logmar: estado.logmarActual },
+  { tipo: 'hablar', orden: 3, mensaje: 'Mirá la pantalla. Decime qué letra ves.' },
+];
+```
+
+**Cliente — `postComparacionContinuar.ts`:**
+
+```typescript
+const POST_COMPARACION_CLIENT_PAUSE_MS = 2000;
+
+const onAudioStopped = () => {
+  if (!pending) return;
+  pending = false;
+  setTimeout(() => {
+    logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
+    session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
+  }, POST_COMPARACION_CLIENT_PAUSE_MS);
+};
+```
+
+**Fuera de alcance Fase 1b:** silenciar VAD / `session.update` durante pausas.
+
+### 9.3 Fases 2–3 — `responseScheduler.ts`
 
 Responsabilidades:
 
@@ -621,17 +724,17 @@ Responsabilidades:
 5. `parseRetryAfter(message)` — extraer segundos de `Please try again in Xs`.
 6. `classifyFailureMode(history)` → `'A' | 'B'` para elegir reintento (§2.6).
 
-### 9.3 Integración (Fases 2–3)
+### 9.4 Integración (Fases 2–3)
 
 | Archivo | Cambio |
 |---------|--------|
 | `src/app/lib/responseScheduler.ts` | Nuevo |
 | `src/app/hooks/useRealtimeSession.ts` | Handlers `response.done` + `rate_limits.updated` |
-| `src/app/lib/postComparacionContinuar.ts` | Nudge vía scheduler; delay mínimo post-`audio_stopped` (~300 ms) |
+| `src/app/lib/postComparacionContinuar.ts` | Nudge vía scheduler; delay **2 s** post-`audio_stopped` (Fase 1b P2) |
 | `src/app/App.tsx` | PTT / `response.create` vía scheduler |
 | `src/app/hooks/useHandleSessionHistory.ts` | Breadcrumb `rate_limit_retry` |
 
-### 9.4 Diagrama de flujo (Fases 2–3)
+### 9.5 Diagrama de flujo (Fases 2–3)
 
 ```
 Triggers (VAD server, PTT, auto_chain, sendUserText)
@@ -653,59 +756,64 @@ response.done (failed, rate_limit_exceeded)
     modo B → response.create (fallback: obtenerEtapa({}))
 ```
 
-### 9.5 Limitación conocida: VAD server-side
+### 9.6 Limitación conocida: VAD server-side
 
-Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor** crea respuestas sin pasar por el scheduler del cliente. Mitigación: Fase 1 (truncation) + Fase 3 (throttling). No se puede interceptar cada `response.create` interno del VAD.
+Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor** crea respuestas sin pasar por el scheduler del cliente. Mitigación: Fase 1 (truncation) + **Fase 1b (pacing)** + Fase 3 (throttling). No se gatea VAD en 1b.
 
 ---
 
 ## 10. Fases de implementación
 
-### Fase 0 — Baseline de métricas (0,25 día, en paralelo con Fase 1)
+### Fase 0 — Baseline de métricas (opcional)
 
 | ID | Tarea |
 |----|-------|
-| 0.1 | Exportar logs de **un** examen sin truncation: `input_tokens`, `cached_tokens`, `rate_limit_exceeded` count |
-| 0.2 | Calcular costo $ baseline con fórmula §7.6 |
-| 0.3 | Anotar TPM pico (ventana 60 s más cargada) |
-
-**Salida:** tabla comparativa para QA de Fase 1.
+| 0.1 | Exportar logs: `input_tokens`, `cached_tokens`, `rate_limit_exceeded` count |
+| 0.2 | Calcular costo $ con fórmula §7.6 |
+| 0.3 | TPM pico (ventana 60 s más cargada) |
 
 ---
 
-### Fase 1 — Truncation Variante A (0,5 día) ⭐ **PRÓXIMA**
+### Fase 1 — Truncation Variante A ✅ **Implementada**
 
-**Objetivo:** reducir presión TPM podando historial server-side antes de llegar a ~8.600 tokens/turno.
+| ID | Tarea | Estado |
+|----|-------|--------|
+| 1.1 | `truncation` `post_instructions: 6000`, `retention_ratio: 0.8` en `session/route.ts` | ✅ `91556dd`, `cf3e243` |
+| 1.2 | Variante B (4500) probada y **revertida** — regresión tool-calling | ✅ `2196183` → `cf3e243` |
+| 1.3 | QA: mejoró TPM pero **aún** aparecen `rate_limit_exceeded` esporádicos | Campo |
+
+**Lección:** truncation 6000 es el piso clínico; no bajar a 4500.
+
+---
+
+### Fase 1b — Pacing TPM 2 s ✅ **Implementada** (pendiente deploy Railway + QA)
+
+**Objetivo:** reducir ráfagas de `response` en ETAPA_4 (agudeza) y post-Sigamos **sin** perder contexto del modelo.
 
 | ID | Tarea | Archivo |
 |----|-------|---------|
-| 1.1 | Agregar `truncation` con `post_instructions: 6000`, `retention_ratio: 0.8` | `src/app/api/session/route.ts` |
-| 1.2 | Verificar en logs que `session.created` / `session.updated` reflejan truncation | Panel Events |
-| 1.3 | Ejecutar examen completo E2E con misma rutina clínica que baseline | Manual |
-| 1.4 | Comparar métricas §7.7 (input/pico, % cache, TPM, rate limits, $) | Logs |
-| 1.5 | QA clínico: sin saltos de etapa, Sigamos/auto_chain OK, interpretaciones correctas | CSV |
+| 1b.1 | Constante `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` | `reference/foroptero-server/motorExamen.js` | ✅ |
+| 1b.2 | Paso `esperar` 2 s **antes** de `tv` + `hablar` cuando `necesitaNuevaLetra` | `generarPasosEtapa4()` | ✅ |
+| 1b.3 | Desplegar backend Railway con cambio 1b.1–1b.2 | Railway | Pendiente |
+| 1b.4 | Constante `POST_COMPARACION_CLIENT_PAUSE_MS = 2000` | `src/app/lib/postComparacionContinuar.ts` | ✅ |
+| 1b.5 | `setTimeout` en `onAudioStopped` antes de `sendMessage` nudge; cleanup en disconnect | `postComparacionContinuar.ts` | ✅ |
+| 1b.6 | QA E2E: examen completo; contar `rate_limit_exceeded` vs post-Fase-1 | Manual + logs |
+| 1b.7 | Verificar ETAPA_4: pausa perceptible entre letras; Sigamos → siguiente pregunta sin regresión | Manual |
 
-**Config a implementar:**
+**Fuera de alcance (acordado):**
 
-```json
-"truncation": {
-  "type": "retention_ratio",
-  "retention_ratio": 0.8,
-  "token_limits": {
-    "post_instructions": 6000
-  }
-}
-```
+- Silenciar VAD / `turn_detection: null` durante pausas.
+- Cambiar `POST_COMPARACION_ESPERA_SEG` (3 s servidor) — se mantiene; P2 es adicional en cliente.
 
 **Criterios de aceptación:**
 
-- [ ] `input_tokens` promedio **< 6.500** en segunda mitad del examen (ETAPA_5/6).
-- [ ] **Cero** `rate_limit_exceeded` en examen completo, o reducción ≥ 80 % vs baseline.
-- [ ] Sin regresión clínica (mismo flujo que `examen-registro-9` / QA Punto 1).
-- [ ] Costo $ del examen documentado; incremento ≤ 25 % vs baseline aceptable si TPM OK.
-- [ ] Si no cumple: escalar a **Variante B** (`post_instructions: 4500`) o combinar con Fase 4 (podado manual).
+- [ ] En ETAPA_4, tras cada respuesta de letra del paciente, hay **≥ 2 s** antes del siguiente `hablar` de nueva letra (medible en logs del motor o timestamp CSV).
+- [ ] Tras `Sigamos con este.`, el nudge `auto_chain` ocurre **≥ 2 s** después de `audio_stopped` (breadcrumb en logs).
+- [ ] Reducción de `rate_limit_exceeded` vs solo truncation (objetivo: cero en examen completo, o ≥ 80 % menos).
+- [ ] Sin regresión: `obtenerEtapa` sigue llamándose; sin improvisación de texto ("correcta H"); auto_chain post-Sigamos OK.
+- [ ] Latencia clínica aceptable (+2 s por letra en agudeza; +2 s por ritual Sigamos donde aplique).
 
-**Si Fase 1 cumple:** Fases 2–3 pasan a “nice to have” (recuperación ante fallos residuales).
+**Si Fase 1b no alcanza:** Fase 2 (reintento reactivo) + evaluar upgrade tier TPM.
 
 ---
 
@@ -713,13 +821,13 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 
 | ID | Tarea |
 |----|-------|
-| 1.1 | `responseScheduler.ts` con handler de `response.done` failed |
-| 1.2 | Parser `Please try again in Xs` |
-| 1.3 | Reintento automático (max 3, backoff + jitter, **sin** esperar `reset_seconds` completo) |
-| 1.4 | Integrar en `handleTransportEvent` |
-| 1.5 | Reintento de `auto_chain` nudge si aplica (modo A post-Sigamos) |
-| 1.6 | Breadcrumb `rate_limit_retry` |
-| 1.7 | Clasificador modo A/B; fallback `obtenerEtapa({})` equivalente a `{}` manual |
+| 2.1 | `responseScheduler.ts` con handler de `response.done` failed |
+| 2.2 | Parser `Please try again in Xs` |
+| 2.3 | Reintento automático (max 3, backoff + jitter) |
+| 2.4 | Integrar en `handleTransportEvent` |
+| 2.5 | Reintento de `auto_chain` nudge si aplica (modo A post-Sigamos) |
+| 2.6 | Breadcrumb `rate_limit_retry` |
+| 2.7 | Clasificador modo A/B; fallback `obtenerEtapa({})` |
 
 **Criterios de aceptación:**
 
@@ -733,10 +841,9 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 
 | ID | Tarea |
 |----|-------|
-| 2.1 | Consumir `rate_limits.updated` en scheduler |
-| 2.2 | `HEADROOM` configurable (default 8.000) |
-| 2.3 | Cola single-flight para triggers explícitos |
-| 2.4 | Delay mínimo post-`audio_stopped` antes de `auto_chain` |
+| 3.1 | Consumir `rate_limits.updated` en scheduler |
+| 3.2 | `HEADROOM` configurable (default 8.000) |
+| 3.3 | Cola single-flight para triggers explícitos |
 
 **Criterios de aceptación:**
 
@@ -751,7 +858,7 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | 4.2 | Evaluar desactivar guardrails en `chatSupervisor` |
 | 4.3 | Acortar prompt / mover tablas de interpretación al backend |
 
-**Cuándo:** si Fase 1 + Variante B aún no alcanzan para TPM.
+**Cuándo:** si Fase 1 + 1b aún no alcanzan para TPM.
 
 ### Fase 5 — UX y operaciones (0,5 día)
 
@@ -775,8 +882,11 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | **D6** | ¿Podar historial automáticamente? | Abierta | `conversation.item.delete` en Fase 4 |
 | **D7** | ¿Upgrade TPM en paralelo? | Abierta | Sí si volumen crece |
 | **D8** | Recuperación modo B | Cerrada | `response.create` primero; `obtenerEtapa({})` fallback (§2.6) |
-| **D9** | Truncation para Fase 1 | **Cerrada** | **Variante A:** `post_instructions: 6000`, `retention_ratio: 0.8` |
-| **D10** | Dónde configurar truncation | **Cerrada** | `src/app/api/session/route.ts` (objeto `session` en `client_secrets`) |
+| **D9** | Truncation `post_instructions` | **Cerrada** | **6000** (no 4500) |
+| **D10** | Dónde configurar truncation | **Cerrada** | `src/app/api/session/route.ts` |
+| **D11** | Pausa agudeza entre letras | **Cerrada** | **2 s** en backend, tras respuesta paciente, antes de `tv` + `hablar` |
+| **D12** | Pausa cliente post-Sigamos | **Cerrada** | **2 s** antes de `auto_chain` nudge |
+| **D13** | Gatear VAD en pausas | **Cerrada** | **No implementar** |
 
 ---
 
@@ -790,10 +900,11 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | VAD server-side fuera del scheduler | Alta | Capa B + C; no interceptable desde cliente |
 | Confundir `reset_seconds` de `requests` con `tokens` | Media | Filtrar siempre `name === "tokens"` |
 | Doble avance servidor al reintentar `obtenerEtapa({})` en modo B | Baja–Media | Preferir `response.create` si tool result ya en historial (D8) |
-| Operador depende de `{}` manual | Alta (hoy) | Fase 2 — automatizar equivalente |
+| Ráfaga agudeza sin pacing | Alta | Fase 1b P1 — `esperar` 2 s en `generarPasosEtapa4` |
+| Ráfaga post-Sigamos | Alta | Fase 1b P2 — delay cliente antes de nudge |
 | Truncation pierde contexto clínico en historial Realtime | Media | Backend stateful; validar QA Fase 1; subir a 6500 si hay regresión |
 | Cache bust → costo $ sube | Media | Aceptable si elimina rate limits; medir en A/B §7.7 |
-| `post_instructions: 6000` insuficiente | Media | Escalar a Variante B (4500) o Fase 4 |
+| `post_instructions: 6000` insuficiente | Media | Fase 1b pacing; luego Fase 2–4 (no bajar a 4500 — D9) |
 
 ---
 
@@ -814,4 +925,6 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 |---------|-------|---------|
 | 0.1 | 2026-07-01 | Documento inicial: síntoma, discovery API tokens, `reset_seconds` vs reintento real, arquitectura y fases |
 | 0.2 | 2026-07-01 | §2 Workflow 3 actores; modos de fallo A/B; evidencia post-Sigamos; workaround `{}` |
-| 0.3 | 2026-07-01 | §7 prompt caching + truncation; **Fase 1 = Variante A** (`post_instructions: 6000`, `retention_ratio: 0.8`); fases 2–5 reordenadas; D9–D10 cerradas |
+| 0.3 | 2026-07-01 | §7 prompt caching + truncation; Fase 1 implementada; Variante B revertida |
+| 0.4 | 2026-07-01 | §7.8 pacing 2 s; **Fase 1b** definida (P1 backend agudeza, P2 cliente Sigamos); D11–D13; VAD fuera de alcance |
+| 0.5 | 2026-07-01 | **Fase 1b implementada** en código (motor + `postComparacionContinuar.ts`); pendiente deploy Railway + QA |

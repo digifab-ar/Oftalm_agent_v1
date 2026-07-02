@@ -3,6 +3,9 @@ import type { RealtimeSession } from '@openai/agents/realtime';
 /** Señal interna (cliente → agente). No se muestra en transcript. */
 export const POST_COMPARACION_CONTINUAR_NUDGE = '__POST_COMPARACION_CONTINUAR__';
 
+/** Pacing TPM: pausa tras TTS de Sigamos y antes del nudge auto_chain (Fase 1b). */
+export const POST_COMPARACION_CLIENT_PAUSE_MS = 2000;
+
 export function isPostComparacionContinuarNudge(text: string): boolean {
   return text.trim() === POST_COMPARACION_CONTINUAR_NUDGE;
 }
@@ -30,6 +33,14 @@ export function attachPostComparacionContinuarHandlers(
   logClientEvent: (obj: Record<string, unknown>, suffix?: string) => void,
 ): () => void {
   let pending = false;
+  let nudgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const clearNudgeTimeout = () => {
+    if (nudgeTimeoutId !== null) {
+      clearTimeout(nudgeTimeoutId);
+      nudgeTimeoutId = null;
+    }
+  };
 
   const onToolEnd = (_ctx: unknown, _agent: unknown, tool: { name?: string }, result: unknown) => {
     if (tool?.name !== 'obtenerEtapa') return;
@@ -48,14 +59,19 @@ export function attachPostComparacionContinuarHandlers(
   ) => {
     if (tool?.name === 'obtenerEtapa' && pending) {
       pending = false;
+      clearNudgeTimeout();
     }
   };
 
   const onAudioStopped = () => {
     if (!pending) return;
     pending = false;
-    logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
-    session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
+    clearNudgeTimeout();
+    nudgeTimeoutId = setTimeout(() => {
+      nudgeTimeoutId = null;
+      logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
+      session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
+    }, POST_COMPARACION_CLIENT_PAUSE_MS);
   };
 
   session.on('agent_tool_end', onToolEnd);
@@ -63,6 +79,7 @@ export function attachPostComparacionContinuarHandlers(
   session.on('audio_stopped', onAudioStopped);
 
   return () => {
+    clearNudgeTimeout();
     session.removeListener('agent_tool_end', onToolEnd);
     session.removeListener('agent_tool_start', onToolStart);
     session.removeListener('audio_stopped', onAudioStopped);
