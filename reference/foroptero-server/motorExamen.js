@@ -1164,6 +1164,26 @@ function generarPasosEtapa2() {
  */
 /** Pacing TPM: pausa tras respuesta del paciente y antes de nueva letra (Fase 1b). */
 const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;
+/** Tiempo con la letra en pantalla antes de que el agente pregunte. */
+const AGUDEZA_ESPERA_TRAS_TV_SEG = 3;
+
+const MSG_AGUDEZA_LETRA_PANTALLA = 'Mirá la pantalla. Decime qué letra ves.';
+
+function pasosTvYLecturaAgudeza(letra, logmar, ordenInicial) {
+  return [
+    { tipo: 'tv', orden: ordenInicial, letra, logmar },
+    {
+      tipo: 'esperar',
+      orden: ordenInicial + 1,
+      esperarSegundos: AGUDEZA_ESPERA_TRAS_TV_SEG
+    },
+    {
+      tipo: 'hablar',
+      orden: ordenInicial + 2,
+      mensaje: MSG_AGUDEZA_LETRA_PANTALLA
+    }
+  ];
+}
 
 function generarPasosEtapa4() {
   const testActual = estadoExamen.secuenciaExamen.testActual;
@@ -1265,17 +1285,7 @@ function generarPasosEtapa4() {
         tipo: 'esperar_foroptero',
         orden: 2
       },
-      {
-        tipo: 'tv',
-        orden: 3,
-        letra: estado.letraActual,
-        logmar: estado.logmarActual
-      },
-      {
-        tipo: 'hablar',
-        orden: 4,
-        mensaje: 'Mirá la pantalla. Decime qué letra ves.'
-      }
+      ...pasosTvYLecturaAgudeza(estado.letraActual, estado.logmarActual, 3)
     ];
 
     return {
@@ -1319,17 +1329,7 @@ function generarPasosEtapa4() {
         tipo: 'esperar_foroptero',
         orden: 2
       },
-      {
-        tipo: 'tv',
-        orden: 3,
-        letra: estado.letraActual,
-        logmar: estado.logmarActual
-      },
-      {
-        tipo: 'hablar',
-        orden: 4,
-        mensaje: 'Mirá la pantalla. Decime qué letra ves.'
-      }
+      ...pasosTvYLecturaAgudeza(estado.letraActual, estado.logmarActual, 3)
     ];
 
     return {
@@ -1384,17 +1384,7 @@ function generarPasosEtapa4() {
       orden: 1,
       esperarSegundos: AGUDEZA_ESPERA_ENTRE_LETRAS_SEG
     },
-    {
-      tipo: 'tv',
-      orden: 2,
-      letra: estado.letraActual,
-      logmar: estado.logmarActual
-    },
-    {
-      tipo: 'hablar',
-      orden: 3,
-      mensaje: 'Mirá la pantalla. Decime qué letra ves.'
-    }
+    ...pasosTvYLecturaAgudeza(estado.letraActual, estado.logmarActual, 2)
   ];
 
   return {
