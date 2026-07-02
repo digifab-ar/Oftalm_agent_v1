@@ -95,7 +95,12 @@ let estadoExamen = {
       mas: false,           // ¿Ya probamos +salto?
       menos: false,         // ¿Ya probamos -salto?
       base: false          // ¿Ya confirmamos base?
-    }
+    },
+    cilindricoSecuencialBajo: false,
+    pasoSecuencialBajo: null,
+    candidatoPaso1: null,
+    alternativoPaso1: null,
+    paso2Fijo: null
   },
   
   // Estado de agudeza (para navegación logMAR)
@@ -236,12 +241,17 @@ export function inicializarExamen(modo = 'normal') {
       saltoActual: null,
       valorMas: null,
       valorMenos: null,
-      valoresProbados: {
-        mas: false,
-        menos: false,
-        base: false
-      }
+    valoresProbados: {
+      mas: false,
+      menos: false,
+      base: false
     },
+    cilindricoSecuencialBajo: false,
+    pasoSecuencialBajo: null,
+    candidatoPaso1: null,
+    alternativoPaso1: null,
+    paso2Fijo: null
+  },
     agudezaEstado: {
       ojo: null,
       logmarActual: null,
@@ -623,34 +633,34 @@ export function aplicarRecalculoEsferico(esfera) {
 }
 
 /**
+ * Cilindro recalculado 0 o −0,25 → modo secuencial §2.6.3.1 (PLAN_FEEDBACK_CLIENTE_EXAMEN).
+ */
+function esCilindricoSecuencialBajo(valorBase) {
+  return valorBase === 0 || valorBase === -0.25;
+}
+
+/** Entre dos cilindros, el más cercano a 0 (0 > −0,25 > −0,50). */
+function cilindricoMasCercanoACero(a, b) {
+  const vals = [a, b].filter((v) => v != null);
+  if (vals.length === 0) return null;
+  return vals.reduce((best, v) => (v > best ? v : best));
+}
+
+/**
  * Determina qué tests de cilindro incluir según el valor del cilindro recalculado
  * @param {number} cilindro - Valor cilíndrico recalculado
  * @returns {object} - Configuración de tests activos
  */
 function determinarTestsActivos(cilindro) {
   const tests = {
-    cilindrico: false,
+    cilindrico: true,
     cilindricoAngulo: false
   };
-  
-  if (cilindro === 0 || cilindro === -0.25) {
-    // No incluir tests de cilindro
-    tests.cilindrico = false;
-    tests.cilindricoAngulo = false;
-  } else if (cilindro <= -0.50 && cilindro >= -1.75) {
-    // Incluir test de cilindro, pero NO de ángulo
-    // Rango: -1.75 a -0.50 (inclusive)
-    // Para números negativos: <= -0.50 significa más negativo, >= -1.75 significa menos negativo
-    tests.cilindrico = true;
-    tests.cilindricoAngulo = false;
-  } else if (cilindro <= -2.00 && cilindro >= -6.00) {
-    // Incluir ambos tests
-    // Rango: -6.00 a -2.00 (inclusive)
-    // Para números negativos: <= -2.00 significa más negativo, >= -6.00 significa menos negativo
-    tests.cilindrico = true;
+
+  if (cilindro <= -2.00 && cilindro >= -6.00) {
     tests.cilindricoAngulo = true;
   }
-  
+
   return tests;
 }
 
@@ -2530,9 +2540,26 @@ function iniciarComparacionLentes(tipo, ojo, valorBase) {
   
   let valorMas = valorBase + saltoActual;
   let valorMenos = valorBase - saltoActual;
+
+  const secuencialBajo = tipo === 'cilindrico' && esCilindricoSecuencialBajo(valorBase);
+  let cilindricoSecuencialBajo = false;
+  let pasoSecuencialBajo = null;
+  let candidatoPaso1 = null;
+  let alternativoPaso1 = null;
+  let paso2Fijo = null;
+
+  if (secuencialBajo) {
+    cilindricoSecuencialBajo = true;
+    pasoSecuencialBajo = 1;
+    alternativoPaso1 = valorBase === 0 ? -0.25 : 0;
+    paso2Fijo = -0.50;
+    valorMas = alternativoPaso1;
+    valorMenos = paso2Fijo;
+    saltoActual = 0.25;
+  }
   
   // Validar que los valores calculados no excedan límites según tipo
-  if (tipo === 'cilindrico') {
+  if (tipo === 'cilindrico' && !secuencialBajo) {
     // Cilindro: -6.00 a 0 (solo negativos o cero)
     if (valorMas > 0) {
       valorMas = 0;
@@ -2587,14 +2614,21 @@ function iniciarComparacionLentes(tipo, ojo, valorBase) {
       mas: false,
       menos: false,
       base: false
-    }
+    },
+    cilindricoSecuencialBajo,
+    pasoSecuencialBajo,
+    candidatoPaso1,
+    alternativoPaso1,
+    paso2Fijo
   };
   
   console.log(`🔍 Iniciando comparación de lentes (${tipo}, ${ojo}):`, {
     valorBase,
     valorMas,
     valorMenos,
-    saltoActual
+    saltoActual,
+    cilindricoSecuencialBajo,
+    pasoSecuencialBajo
   });
   
   return { ok: true, comparacionIniciada: true };
@@ -2879,13 +2913,6 @@ function generarPasosEtapa5() {
     } else if (tipo === 'cilindrico') {
       // El valor base es el valor recalculado de cilindro para este ojo
       valorBase = estadoExamen.valoresRecalculados[ojo].cilindro;
-      // Validar que el cilindro no sea 0 ni -0.25 (no debería estar en la secuencia si es así)
-      if (valorBase === 0 || valorBase === -0.25) {
-        return {
-          ok: false,
-          error: 'El test de cilindro no aplica para este ojo (cilindro = 0 o -0.25)'
-        };
-      }
     } else if (tipo === 'cilindrico_angulo') {
       // El valor base es el valor inicial de ángulo (NO recalculado) para este ojo
       valorBase = estadoExamen.valoresIniciales[ojo].angulo;
@@ -3057,6 +3084,45 @@ function interpretarPreferenciaLente(respuestaPaciente, interpretacionComparacio
 }
 
 /**
+ * Modo cilíndrico secuencial bajo (base 0 / −0,25): 2 comparativas, 1 confirmación cada una (§2.6.3.1).
+ */
+function procesarRespuestaCilindricoSecuencialBajo(estado, preferencia, snapCara, snapOtro) {
+  const elegirCandidato = () => {
+    if (preferencia === 'actual') return snapCara;
+    if (preferencia === 'anterior') return snapOtro;
+    return cilindricoMasCercanoACero(snapCara, snapOtro);
+  };
+
+  if (estado.pasoSecuencialBajo === 1) {
+    const c1 = elegirCandidato();
+    estado.candidatoPaso1 = c1;
+    estado.pasoSecuencialBajo = 2;
+    estado.faseComparacion = 'mostrando_alternativo';
+
+    console.log(`📊 Cilíndrico secuencial bajo — paso 1 → C1=${c1}, siguiente vs ${estado.paso2Fijo}`);
+
+    return {
+      ok: true,
+      necesitaMostrarLente: true,
+      valorAMostrar: estado.paso2Fijo,
+      valorElegidoReanclaje: c1,
+      preferenciaAplicada: preferencia
+    };
+  }
+
+  if (estado.pasoSecuencialBajo === 2) {
+    const c2 = elegirCandidato();
+    estado.faseComparacion = 'confirmado';
+
+    console.log(`📊 Cilíndrico secuencial bajo — paso 2 confirmado: ${c2}`);
+
+    return confirmarResultado(c2);
+  }
+
+  return { ok: false, error: 'Estado cilindricoSecuencialBajo inválido' };
+}
+
+/**
  * Procesa la respuesta del paciente en la comparación de lentes
  * @param {string} respuestaPaciente - Respuesta del paciente (texto crudo)
  * @param {object} interpretacionComparacion - Interpretación estructurada del agente
@@ -3099,8 +3165,19 @@ function procesarRespuestaComparacionLentes(respuestaPaciente, interpretacionCom
     valorActual: estado.valorActual,
     valorAnterior: estado.valorAnterior,
     valorBase: estado.valorBase,
-    confirmaciones: estado.confirmaciones
+    confirmaciones: estado.confirmaciones,
+    cilindricoSecuencialBajo: estado.cilindricoSecuencialBajo,
+    pasoSecuencialBajo: estado.pasoSecuencialBajo
   });
+
+  if (estado.cilindricoSecuencialBajo) {
+    return procesarRespuestaCilindricoSecuencialBajo(
+      estado,
+      preferencia,
+      snapCara,
+      snapOtro
+    );
+  }
   
   // Procesar según preferencia y fase
   if (preferencia === 'anterior') {
@@ -3322,7 +3399,12 @@ function confirmarResultado(valorFinal) {
       mas: false,
       menos: false,
       base: false
-    }
+    },
+    cilindricoSecuencialBajo: false,
+    pasoSecuencialBajo: null,
+    candidatoPaso1: null,
+    alternativoPaso1: null,
+    paso2Fijo: null
   };
   
   // Avanzar al siguiente test

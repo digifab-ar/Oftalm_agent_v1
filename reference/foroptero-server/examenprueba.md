@@ -135,7 +135,8 @@ En todos los casos, los tests de prueba se realizan **en ambos ojos** cuando apl
 
 - Consideraciones:
   - Se **respeta exactamente** la lógica actual de inclusión de tests:
-    - Si el cilindro recalculado es 0 o -0.25, no hay tests de cilindro para ese ojo.
+    - Potencia cilíndrica **siempre** por ojo; ángulo según `determinarTestsActivos` (solo si cilindro ≤ −2.00).
+    - Bases `0` / `−0.25`: modo secuencial (2 comparativas); ver `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3.1.
     - Si entra en los rangos definidos, se incluyen los tests correspondientes.
   - No se fuerza la ejecución de tests de cilindro cuando la lógica actual los desactiva.
 

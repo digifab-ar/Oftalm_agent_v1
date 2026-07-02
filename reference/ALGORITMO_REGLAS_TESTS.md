@@ -161,16 +161,25 @@ function iniciarComparacionLentes(tipo, ojo, valorBase) {
 
 ### Cilíndrico
 
+**Bases `≤ −0,50`:** bracket ±0,50 D sobre la base (sin cambios).
+
+**Bases `0` / `−0,25` (`cilindricoSecuencialBajo`):** 2 comparativas, 1 confirmación cada una; reanclaje al lente elegido entre pasos (mismo contrato ETAPA_5).
+
+| Base | Paso 1 | Paso 2 |
+|------|--------|--------|
+| `0` | `0` vs `−0,25` | ganador vs `−0,50` |
+| `−0,25` | `−0,25` vs `0` | ganador vs `−0,50` |
+
+Si `igual`: valor más cercano a 0 (`0` > `−0,25` > `−0,50`).
+
 ```javascript
+// Bases ≤ −0,50 — sin cambios
 function iniciarComparacionLentes(tipo, ojo, valorBase) {
   const comparacion = estadoExamen.comparacionActual;
-  const salto = 0.50; // Similar a esférico grueso
-  
-  // Para cilíndrico, los valores son negativos
-  // Ejemplo: base -1.75, probar -1.25 (menos negativo) y -2.25 (más negativo)
+  const salto = 0.50;
   comparacion.saltoActual = salto;
-  comparacion.valorMas = valorBase + salto;  // Menos negativo (mejor)
-  comparacion.valorMenos = valorBase - salto; // Más negativo
+  comparacion.valorMas = valorBase + salto;
+  comparacion.valorMenos = valorBase - salto;
   // ...
 }
 ```

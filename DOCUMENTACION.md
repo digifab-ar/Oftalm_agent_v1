@@ -199,9 +199,9 @@ Configuración del agente AI conversacional.
   - `normal` → secuencia completa (`generarSecuenciaExamen`)
   - modos de prueba → subconjunto (`generarSecuenciaPrueba`) — ver `examenprueba.md`
 - En modo normal, determina qué tests de cilindro incluir según el valor del cilindro recalculado:
-  - Cilindro = 0 o -0.25 → No incluir tests de cilindro
-  - Cilindro entre -0.50 y -1.75 → Incluir test de cilindro, NO de ángulo
-  - Cilindro entre -2.00 y -6.00 → Incluir ambos tests (cilindro y ángulo)
+  - **Test cilíndrico (potencia):** siempre incluido por ojo
+  - **Test cilíndrico ángulo:** solo si cilindro recalculado entre -2.00 y -6.00 (inclusive)
+  - Bases `0` / `-0.25`: comparativa secuencial en 2 pasos (§2.6.3.1 en `PLAN_FEEDBACK_CLIENTE_EXAMEN.md`)
 - Configura foróptero inicial (R abierto, L cerrado)
 - Inicializa `testActual` con el primer test de la secuencia
 - **Transición de etapa:** `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)` (no forzar siempre ETAPA_4; el primer test puede ser lentes o binocular en modos de prueba)
@@ -261,7 +261,9 @@ Configuración del agente AI conversacional.
    - **Bug corregido (2025-01-27):** Sistema de confirmación ahora incrementa correctamente las confirmaciones en lugar de resetearlas, evitando comparaciones duplicadas (ej: 0.75 vs 0.75)
 
 3. ✅ **Lente Cilíndrico** (por ojo, opcional)
-   - Solo si cilindro recalculado ≠ 0 y ≠ -0.25
+   - **Siempre** (potencia cilíndrica por ojo)
+   - Bases `0` / `-0.25`: modo `cilindricoSecuencialBajo` — paso 1 (`0`↔`−0,25` o `−0,25`↔`0`), paso 2 (ganador vs `−0,50`); 1 confirmación por paso
+   - Bases `≤ −0,50`: bracket ±0,50 D sobre la base (sin cambios)
    - Usa valor cilíndrico recalculado como punto de partida
    - Saltos de ±0.50
    - Estrategia de 3 valores (base, +0.50, -0.50)
@@ -354,8 +356,8 @@ Los tests de cilindro se incluyen según el valor del cilindro recalculado:
 
 | Cilindro Recalculado | Test Cilíndrico | Test Cilíndrico Ángulo |
 |----------------------|-----------------|------------------------|
-| 0 o -0.25            | ❌ No           | ❌ No                  |
-| -0.50 a -1.75        | ✅ Sí           | ❌ No                  |
+| 0 o -0.25            | ✅ Sí (secuencial 2 pasos) | ❌ No |
+| -0.50 a -1.75        | ✅ Sí (±0,50 D)  | ❌ No                  |
 | -2.00 a -6.00        | ✅ Sí           | ✅ Sí                  |
 
 ---
