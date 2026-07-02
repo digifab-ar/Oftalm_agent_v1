@@ -1,11 +1,12 @@
 # Plan de implementación — Resiliencia ante `rate_limit_exceeded` (examen visual)
 
-**Versión:** 0.4  
+**Versión:** 0.7  
 **Fecha:** 2026-07-01  
-**Estado:** Fase 1 (truncation 6000) **implementada** — **Fase 1b (pacing 2 s)** **implementada** (pendiente deploy backend + QA)  
+**Estado:** Fases **1** y **1b** ✅ implementadas y **QA OK** — TPM residual esporádico → **Fase 2** (reintento) + **Fase 3** (throttling) siguientes  
 **Proyecto:** `openai-realtime-agents-main-2`  
 **Relacionado con:** `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` (fluidez post-Sigamos), agente `chatSupervisor`  
-**Modelo:** `gpt-realtime-mini-2025-12-15` (límite compartido TPM con `gpt-4o-mini-realtime`: 40.000)
+**Modelo:** `gpt-realtime-mini-2025-12-15` (TPM compartido con `gpt-4o-mini-realtime`)  
+**Cuenta hoy:** **Tier 1** — **40.000 TPM** (ver §4.5)
 
 ---
 
@@ -47,10 +48,10 @@ Durante el examen visual, de forma **esporádica**, el agente Realtime queda en 
 **Estrategia acordada:** abordar TPM en capas:
 
 1. **Fase 1 ✅** — truncation Variante A (`post_instructions: 6000`, `retention_ratio: 0.8`).
-2. **Fase 1b ⭐ (próxima)** — pacing **2 s**: backend entre letras en agudeza + cliente antes de `auto_chain`.
-3. **Fases 2–3** — reintento automático + throttling (si 1b no alcanza).
+2. **Fase 1b ✅** — pacing backend + cliente; pausa lectura post-TV (3 s); prompt tool-first agudeza. **QA OK** (§10).
+3. **Fases 2–3 ⭐ (siguiente)** — reintento automático + throttling para TPM residual esporádico.
 
-**Esfuerzo orientativo Fase 1b:** ~0,5 día implementación + 1 examen QA.
+**Resultado QA (2026-07-01):** lo implementado en Fase 1 + 1b **funciona** (flujo clínico, pacing, tool-calling en agudeza). Aún aparecen **`rate_limit_exceeded` esporádicos** en ciertos momentos del examen; no se resuelven con más pacing — abordar con Fase 2–3 u operacional (tier TPM).
 
 ---
 
@@ -262,6 +263,19 @@ Examen avanzado (contexto grande)
 
 Ver diagrama §2.7. El fallo ocurre en la **response del auto_chain**, no en la comunicación con Railway.
 
+### 4.5 Límite operacional — tier TPM de la cuenta
+
+El techo de `limit` en `rate_limits.updated` (`name: "tokens"`) depende del **tier de uso** de la organización en OpenAI, no del código del examen.
+
+| Tier | TPM (`tokens` / ventana 60 s) | Estado en proyecto |
+|------|-------------------------------|---------------------|
+| **Tier 1** | **40.000** | **Actual** — límite observado en logs y errores `rate_limit_exceeded` |
+| **Tier 2** | **200.000** | Upgrade operacional posible (×5 vs Tier 1) |
+
+Aplica al bucket compartido de modelos Realtime mini (p. ej. `gpt-realtime-mini-2025-12-15` y `gpt-4o-mini-realtime`). Subir de tier **no reemplaza** Fases 2–3 (reintento + throttling): reduce la frecuencia del problema pero no elimina picos de consumo en ventanas de 60 s.
+
+**Referencias:** [Rate limits — OpenAI API](https://developers.openai.com/api/docs/guides/rate-limits); límites exactos por tier en el dashboard de la org (`Settings` → `Limits`).
+
 ---
 
 ## 5. Discovery — qué expone la API sobre tokens
@@ -304,7 +318,7 @@ Emitido al **inicio** y al **fin** de cada respuesta (junto con `response.done`)
 |-------|-----|
 | `name: "tokens"` | **Este** es el límite relevante para TPM del examen |
 | `remaining` | Tokens que aún podés consumir en la ventana actual (ya incluye reservas de respuestas en curso) |
-| `limit` | Techo de la ventana (ej. 40.000) |
+| `limit` | Techo de la ventana — **40.000** en **Tier 1** (cuenta actual); **200.000** en **Tier 2** (§4.5) |
 | `reset_seconds` | Ver §6 — **no** usar como única guía de reintento |
 
 **Nota:** al crear una respuesta, el servidor **reserva** tokens de output (típicamente hasta el máximo configurado). `remaining` refleja esa reserva y se ajusta al completar `response.done`.
@@ -572,6 +586,7 @@ Alternativa a truncar más: **espaciar** `response` de Realtime en el tiempo (ve
 | ID | Pausa | Duración | Dónde | Fuera de alcance |
 |----|-------|----------|-------|------------------|
 | **P1** | Tras respuesta del paciente en agudeza, **antes** de mostrar otra letra | **2 s** | Backend (`motorExamen.js`) | — |
+| **P1b** | Tras cambiar TV, **antes** de `hablar` "Mirá la pantalla…" | **3 s** | Backend — `pasosTvYLecturaAgudeza()` | Lectura clínica |
 | **P2** | Tras TTS de Sigamos, **antes** del nudge `auto_chain` | **2 s** | Cliente (`postComparacionContinuar.ts`) | — |
 | — | Gatear / silenciar VAD durante pausas | — | — | **No implementar** (acordado) |
 
@@ -581,20 +596,24 @@ Alternativa a truncar más: **espaciar** `response` de Realtime en el tiempo (ve
 Paciente: "H"
   → agente llama obtenerEtapa({ interpretacionAgudeza })
     → motor: procesarRespuestaAgudeza → necesitaNuevaLetra: true
-      → [NUEVO: esperar 2 s]          ← entre procesar y mostrar letra
-      → tv (nueva letra) + hablar "Mirá la pantalla..."
+      → [esperar 2 s]          ← P1: entre procesar y mostrar letra
+      → tv (nueva letra)
+      → [esperar 3 s]          ← P1b: letra visible antes de hablar
+      → hablar "Mirá la pantalla..."
   → agente pronuncia
   → (paciente puede responder)
 ```
 
 **No** es pausa al **confirmar** agudeza (2 confirmaciones → pasar a lentes). Es pausa en el **bucle intra-test**: cada vez que hay `necesitaNuevaLetra` tras una respuesta del paciente.
 
-**Implementación prevista (backend):**
+**Implementación (backend):**
 
-| Archivo | Cambio |
-|---------|--------|
-| `reference/foroptero-server/motorExamen.js` | Constante `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` |
-| `generarPasosEtapa4()` | Insertar `{ tipo: 'esperar', esperarSegundos: 2 }` **antes** del paso `tv` en el bloque de nueva letra (líneas ~1378–1389) |
+| Archivo | Cambio | Commit |
+|---------|--------|--------|
+| `motorExamen.js` | `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` | `0413461` |
+| `generarPasosEtapa4()` | P1: `esperar` antes de `tv` en nueva letra | `0413461` |
+| `motorExamen.js` | `AGUDEZA_ESPERA_TRAS_TV_SEG = 3`; helper `pasosTvYLecturaAgudeza()` | `fd14e97` |
+| `chatSupervisor/index.ts` | Regla **tool-first** ETAPA_4 (no verbalizar `interpretacionAgudeza`) | `d136f17` |
 
 Preferir **un solo punto** en `generarPasosEtapa4` al armar el array `pasos`, para que `ejecutarPasosAutomaticamente` lo respete siempre (incluye la rama `necesitaNuevaLetra` en `obtenerInstrucciones` §2246).
 
@@ -628,11 +647,24 @@ Paciente habla                       TTS "Sigamos..."
 obtenerEtapa + tool                  audio_stopped
      │                                    │
      ▼                                    ▼
-[esperar 2s] ← P1 backend           [esperar 2s] ← P2 cliente
-     │                                    │
-     ▼                                    ▼
-TV + nueva letra                     auto_chain nudge
+[esperar 2s] ← P1          [esperar 2s] ← P2 cliente
+     │                            │
+     ▼                            ▼
+TV → [esperar 3s] ← P1b      auto_chain nudge
+     │
+     ▼
+hablar (agente)
 ```
+
+#### Resultado QA Fase 1b (2026-07-01)
+
+| Aspecto | Resultado |
+|---------|-----------|
+| Flujo clínico agudeza alcanzada | ✅ OK — tool-first, sin verbalizar interpretación |
+| Pausas perceptibles (P1 + P1b) | ✅ OK — tiempo suficiente para ver cada letra |
+| Post-Sigamos / `auto_chain` | ✅ OK — sin regresión |
+| `rate_limit_exceeded` | ⚠️ **Aún esporádico** en algunos momentos del examen completo |
+| Conclusión | **Fase 1b cerrada** como preventivo; TPM residual → **Fase 2** (reintento) + **Fase 3** (throttling), no más pacing |
 
 ---
 
@@ -643,11 +675,11 @@ TV + nueva letra                     auto_chain nudge
 | Capa | Nombre | Objetivo | Fase |
 |------|--------|----------|------|
 | **T** | Truncation 6000 | Techo de historial sin perder tool-calling | **1** ✅ |
-| **P** | Pacing 2 s | Espaciar responses (agudeza + post-Sigamos) | **1b** ✅ |
-| **A** | Reintento reactivo | Recuperar silencios tras `rate_limit_exceeded` | 2 |
-| **B** | Throttling proactivo | Prevenir fallos con `remaining` + cola | 3 |
+| **P** | Pacing 2 s + lectura 3 s post-TV | Espaciar responses; tiempo clínico en agudeza | **1b** ✅ |
+| **A** | Reintento reactivo | Recuperar silencios tras `rate_limit_exceeded` | **2** ⭐ |
+| **B** | Throttling proactivo | Prevenir fallos con `remaining` + cola | **3** ⭐ |
 | **C** | Podado manual historial | `conversation.item.delete` tool outputs viejos | 4 |
-| **E** | Operacional | Subir tier TPM en cuenta OpenAI | Paralelo |
+| **E** | Operacional | Subir tier TPM (Tier 1 → Tier 2: 40k → 200k) | Paralelo |
 
 ### 8.2 Caminos descartados o secundarios
 
@@ -681,37 +713,28 @@ const TRUNCATION_POST_INSTRUCTIONS = 6000;
 const TRUNCATION_RETENTION_RATIO = 0.8;
 ```
 
-### 9.2 Fase 1b — pacing (próximo)
+### 9.2 Fase 1b — pacing ✅ **Implementada y validada**
 
 **Backend — `motorExamen.js`:**
 
 ```javascript
-const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;
+const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;  // P1 — TPM, antes de TV
+const AGUDEZA_ESPERA_TRAS_TV_SEG = 3;       // P1b — lectura, tras TV
 
-// En generarPasosEtapa4(), bloque nueva letra (~1378):
-const pasos = [
-  { tipo: 'esperar', orden: 1, esperarSegundos: AGUDEZA_ESPERA_ENTRE_LETRAS_SEG },
-  { tipo: 'tv', orden: 2, letra: estado.letraActual, logmar: estado.logmarActual },
-  { tipo: 'hablar', orden: 3, mensaje: 'Mirá la pantalla. Decime qué letra ves.' },
-];
+function pasosTvYLecturaAgudeza(letra, logmar, ordenInicial) {
+  return [
+    { tipo: 'tv', orden: ordenInicial, letra, logmar },
+    { tipo: 'esperar', orden: ordenInicial + 1, esperarSegundos: AGUDEZA_ESPERA_TRAS_TV_SEG },
+    { tipo: 'hablar', orden: ordenInicial + 2, mensaje: 'Mirá la pantalla. Decime qué letra ves.' },
+  ];
+}
 ```
 
-**Cliente — `postComparacionContinuar.ts`:**
+**Cliente — `postComparacionContinuar.ts`:** `POST_COMPARACION_CLIENT_PAUSE_MS = 2000` (P2).
 
-```typescript
-const POST_COMPARACION_CLIENT_PAUSE_MS = 2000;
+**Prompt — `chatSupervisor/index.ts`:** regla tool-first ETAPA_4 (`d136f17`).
 
-const onAudioStopped = () => {
-  if (!pending) return;
-  pending = false;
-  setTimeout(() => {
-    logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
-    session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
-  }, POST_COMPARACION_CLIENT_PAUSE_MS);
-};
-```
-
-**Fuera de alcance Fase 1b:** silenciar VAD / `session.update` durante pausas.
+**QA:** examen completo probado con éxito; ver §7.8 y §10 Fase 1b.
 
 ### 9.3 Fases 2–3 — `responseScheduler.ts`
 
@@ -786,38 +809,40 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 
 ---
 
-### Fase 1b — Pacing TPM 2 s ✅ **Implementada** (pendiente deploy Railway + QA)
+### Fase 1b — Pacing TPM + lectura agudeza ✅ **Cerrada (QA OK)**
 
-**Objetivo:** reducir ráfagas de `response` en ETAPA_4 (agudeza) y post-Sigamos **sin** perder contexto del modelo.
+**Objetivo:** reducir ráfagas de `response` en ETAPA_4 y post-Sigamos **sin** perder contexto del modelo; dar tiempo de lectura de cada letra.
 
-| ID | Tarea | Archivo |
-|----|-------|---------|
-| 1b.1 | Constante `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` | `reference/foroptero-server/motorExamen.js` | ✅ |
-| 1b.2 | Paso `esperar` 2 s **antes** de `tv` + `hablar` cuando `necesitaNuevaLetra` | `generarPasosEtapa4()` | ✅ |
-| 1b.3 | Desplegar backend Railway con cambio 1b.1–1b.2 | Railway | Pendiente |
-| 1b.4 | Constante `POST_COMPARACION_CLIENT_PAUSE_MS = 2000` | `src/app/lib/postComparacionContinuar.ts` | ✅ |
-| 1b.5 | `setTimeout` en `onAudioStopped` antes de `sendMessage` nudge; cleanup en disconnect | `postComparacionContinuar.ts` | ✅ |
-| 1b.6 | QA E2E: examen completo; contar `rate_limit_exceeded` vs post-Fase-1 | Manual + logs |
-| 1b.7 | Verificar ETAPA_4: pausa perceptible entre letras; Sigamos → siguiente pregunta sin regresión | Manual |
+| ID | Tarea | Archivo | Estado |
+|----|-------|---------|--------|
+| 1b.1 | `AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2` (P1) | `motorExamen.js` | ✅ `0413461` |
+| 1b.2 | `esperar` 2 s antes de `tv` en nueva letra | `generarPasosEtapa4()` | ✅ |
+| 1b.3 | Deploy backend Railway | Railway | ✅ |
+| 1b.4 | `POST_COMPARACION_CLIENT_PAUSE_MS = 2000` (P2) | `postComparacionContinuar.ts` | ✅ `0413461` |
+| 1b.5 | `setTimeout` + cleanup en disconnect | `postComparacionContinuar.ts` | ✅ |
+| 1b.6 | QA E2E examen completo | Manual + logs | ✅ **OK** |
+| 1b.7 | ETAPA_4 pacing + Sigamos sin regresión | Manual | ✅ **OK** |
+| 1b.8 | `AGUDEZA_ESPERA_TRAS_TV_SEG = 3` (P1b); `pasosTvYLecturaAgudeza()` | `motorExamen.js` | ✅ `fd14e97` |
+| 1b.9 | Prompt tool-first agudeza (no verbalizar interpretación) | `chatSupervisor/index.ts` | ✅ `d136f17` |
 
 **Fuera de alcance (acordado):**
 
 - Silenciar VAD / `turn_detection: null` durante pausas.
-- Cambiar `POST_COMPARACION_ESPERA_SEG` (3 s servidor) — se mantiene; P2 es adicional en cliente.
+- Más pacing como única palanca ante TPM residual.
 
 **Criterios de aceptación:**
 
-- [ ] En ETAPA_4, tras cada respuesta de letra del paciente, hay **≥ 2 s** antes del siguiente `hablar` de nueva letra (medible en logs del motor o timestamp CSV).
-- [ ] Tras `Sigamos con este.`, el nudge `auto_chain` ocurre **≥ 2 s** después de `audio_stopped` (breadcrumb en logs).
-- [ ] Reducción de `rate_limit_exceeded` vs solo truncation (objetivo: cero en examen completo, o ≥ 80 % menos).
-- [ ] Sin regresión: `obtenerEtapa` sigue llamándose; sin improvisación de texto ("correcta H"); auto_chain post-Sigamos OK.
-- [ ] Latencia clínica aceptable (+2 s por letra en agudeza; +2 s por ritual Sigamos donde aplique).
+- [x] ETAPA_4: pausa **≥ 2 s** antes de nueva letra (P1) y **≥ 3 s** con letra en pantalla antes de `hablar` (P1b).
+- [x] Post-Sigamos: nudge `auto_chain` **≥ 2 s** tras `audio_stopped` (P2).
+- [x] Sin regresión clínica: `obtenerEtapa` tool-first; post-Sigamos OK.
+- [x] Latencia clínica aceptable.
+- [ ] Cero `rate_limit_exceeded` en examen completo — **no alcanzado**; queda esporádico → Fase 2–3.
 
-**Si Fase 1b no alcanza:** Fase 2 (reintento reactivo) + evaluar upgrade tier TPM.
+**Conclusión QA:** lo implementado **funciona** y mejora fluidez y UX en agudeza. TPM límite **no eliminado por completo**; siguiente paso: **Fase 2** (reintento reactivo) + **Fase 3** (throttling), no ampliar pacing.
 
 ---
 
-### Fase 2 — Reintento reactivo (1 día)
+### Fase 2 — Reintento reactivo ⭐ **Próxima** (1 día)
 
 | ID | Tarea |
 |----|-------|
@@ -866,7 +891,7 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 |----|-------|
 | 4.1 | Indicador discreto “Un momento…” si delay > 3 s |
 | 4.2 | Métrica `rate_limit_events / examen` en logs |
-| 4.3 | Evaluar upgrade tier TPM con datos de Fase 0 |
+| 4.3 | Evaluar upgrade **Tier 1 → Tier 2** (40k → 200k TPM) con datos de Fase 0 / QA |
 
 ---
 
@@ -880,13 +905,15 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | **D4** | Max wait por intento | Abierta | **15s** — no usar `reset_seconds` como piso |
 | **D5** | ¿Desactivar guardrails en examen? | Abierta | Evaluar en Fase 4 |
 | **D6** | ¿Podar historial automáticamente? | Abierta | `conversation.item.delete` en Fase 4 |
-| **D7** | ¿Upgrade TPM en paralelo? | Abierta | Sí si volumen crece |
+| **D7** | ¿Upgrade TPM en paralelo? | Abierta | **Tier 2** (200k TPM) como palanca operacional; no sustituye Fase 2–3 |
 | **D8** | Recuperación modo B | Cerrada | `response.create` primero; `obtenerEtapa({})` fallback (§2.6) |
 | **D9** | Truncation `post_instructions` | **Cerrada** | **6000** (no 4500) |
 | **D10** | Dónde configurar truncation | **Cerrada** | `src/app/api/session/route.ts` |
 | **D11** | Pausa agudeza entre letras | **Cerrada** | **2 s** en backend, tras respuesta paciente, antes de `tv` + `hablar` |
 | **D12** | Pausa cliente post-Sigamos | **Cerrada** | **2 s** antes de `auto_chain` nudge |
 | **D13** | Gatear VAD en pausas | **Cerrada** | **No implementar** |
+| **D14** | Pausa lectura post-TV agudeza | **Cerrada** | **3 s** (`AGUDEZA_ESPERA_TRAS_TV_SEG`) tras `tv`, antes de `hablar` |
+| **D15** | ¿Más pacing si persiste TPM? | **Cerrada** | **No** — Fase 2–3; QA confirma pacing suficiente |
 
 ---
 
@@ -905,6 +932,7 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | Truncation pierde contexto clínico en historial Realtime | Media | Backend stateful; validar QA Fase 1; subir a 6500 si hay regresión |
 | Cache bust → costo $ sube | Media | Aceptable si elimina rate limits; medir en A/B §7.7 |
 | `post_instructions: 6000` insuficiente | Media | Fase 1b pacing; luego Fase 2–4 (no bajar a 4500 — D9) |
+| TPM insuficiente en Tier 1 (40k) | Media–Alta | Fase 2–3; evaluar **Tier 2** (200k TPM) en paralelo (§4.5, D7) |
 
 ---
 
@@ -928,3 +956,5 @@ Con `server_vad` + `create_response: true` en `session/route.ts`, el **servidor*
 | 0.3 | 2026-07-01 | §7 prompt caching + truncation; Fase 1 implementada; Variante B revertida |
 | 0.4 | 2026-07-01 | §7.8 pacing 2 s; **Fase 1b** definida (P1 backend agudeza, P2 cliente Sigamos); D11–D13; VAD fuera de alcance |
 | 0.5 | 2026-07-01 | **Fase 1b implementada** en código (motor + `postComparacionContinuar.ts`); pendiente deploy Railway + QA |
+| 0.6 | 2026-07-01 | **QA Fase 1b OK**; P1b lectura 3 s post-TV (`fd14e97`); prompt tool-first (`d136f17`); TPM residual → Fase 2–3; D14–D15 |
+| 0.7 | 2026-07-01 | §4.5 tier TPM: **Tier 1** 40k (actual) vs **Tier 2** 200k; D7 y capa E actualizadas |
