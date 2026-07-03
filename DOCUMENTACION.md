@@ -393,8 +393,14 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
 
 **Regla de contrato (ETAPA_5):**
 - En `ETAPA_5` la respuesta del backend siempre incluye al menos un paso `hablar`.
-- Mensaje estándar de comparación: `Ves mejor con este o con el anterior?`.
+- Pregunta de comparación (C12): 3 variantes rotativas en `motorExamen.js` (`mensajeComparacionLentes()`); el agente las lee verbatim desde `pasos[].mensaje`.
+- Primera comparación de esférico grueso: un solo `hablar` (sin intro aparte; ex-C13 eliminado).
+- El agente envía `interpretacionComparacion` cuando `contexto.comparacionEstado.faseComparacion === "preguntando"` (no por frase literal).
 - Esto aplica también en transiciones internas del mismo stage (ej: `esferico_grueso` → `esferico_fino`).
+
+**Regla de contrato (ETAPA_6 binocular):**
+- Pregunta combinada: 3 variantes (`mensajeBinocPreguntaCombinada()`), vocabulario «lente anterior / nuevo».
+- El agente envía `interpretacionComparacion` cuando `faseBinocular` es `binoc_esfera_preguntando` o `binoc_cil_preguntando`.
 
 ### Tipos de Pasos
 

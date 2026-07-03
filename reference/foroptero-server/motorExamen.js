@@ -147,6 +147,14 @@ let estadoExamen = {
 
   /** true tras ETAPA_3 con ambos ojos posicionados a recalculados (OI ocluido). */
   lentesPreajustadasBilateral: false,
+
+  /** PLAN_COPY_NATURAL_AGENTE — rotación determinística de copys (contador % 3) */
+  contadoresCopy: {
+    agudezaPreguntas: 0,
+    postComparacion: 0,
+    comparacionLentes: 0,
+    comparacionBinoc: 0
+  },
   
   // Secuencia del examen
   secuenciaExamen: {
@@ -183,7 +191,7 @@ let estadoExamen = {
 
   /**
    * Tras confirmar un test de lentes: si el siguiente es otro test de lentes mismo ojo (grueso→fino, …),
-   * se programa ritual reanclaje + 3s + Sigamos antes de iniciar la comparación (§4.4 P3–P4). null si no aplica.
+   * se programa ritual reanclaje + 3s + mensaje post-comparación (C11) antes de iniciar la comparación (§4.4 P3–P4). null si no aplica.
    */
   ritualInterTestsPendiente: null
 };
@@ -281,7 +289,13 @@ export function inicializarExamen(modo = 'normal') {
     preGruesoVisual: null,
     adaptacionPreGruesoEmitidaParaIndice: null,
     lentesPreajustadasBilateral: false,
-    /** Tras "Sigamos con este.", siguiente llamada sin respuesta ejecuta pasos automáticos pendientes */
+    contadoresCopy: {
+      agudezaPreguntas: 0,
+      postComparacion: 0,
+      comparacionLentes: 0,
+      comparacionBinoc: 0
+    },
+    /** Tras ritual post-comparación (postComparacionContinuar), siguiente llamada sin respuesta ejecuta pasos pendientes */
     deferredPostComparacion: null,
     ritualInterTestsPendiente: null,
     secuenciaExamen: {
@@ -944,6 +958,56 @@ const MSG_REPREGUNTA_AJUSTE = '¿Ahora ves bien o necesitás un ajuste más?';
 const MSG_LOGMAR_MAX_PRE_GRUESO =
   'Ya estamos en la fila más grande disponible. Seguimos con esta y pasamos a la comparación de lentes.';
 
+/** PLAN_COPY_NATURAL_AGENTE — rotación determinística de copys al paciente */
+function elegirVariante(variantes, indice) {
+  const n = variantes.length;
+  return variantes[((indice % n) + n) % n];
+}
+
+const MSG_AGUDEZA_LETRA_PANTALLA_VARIANTES = [
+  'Mirá la pantalla y decime qué letra ves.',
+  'Fijate la letra en la pantalla… decime cuál es.',
+  'Mirá con calma la pantalla y contame qué letra distinguís.'
+];
+
+const MSG_POST_COMPARACION_LENTES_VARIANTES = [
+  'Bueno, volvemos a tu selección.',
+  'Perfecto, seguimos con el lente que elegiste.',
+  'Bien, me quedo con la opción elegida y continuamos.'
+];
+
+const MSG_COMPARACION_LENTES_VARIANTES = [
+  'Y ahora, ¿ves mejor con el nuevo lente o con el anterior?',
+  '¿Con cuál ves más claro: con el lente nuevo o con el anterior?',
+  'Probemos así… ¿preferís el lente nuevo o el anterior?'
+];
+
+const MSG_BINOC_PREGUNTA_COMBINADA_VARIANTES = [
+  'Ahora probamos otro par de lentes. ¿Ves mejor con el lente anterior o con el nuevo?',
+  'Voy a cambiarte los lentes… fijate bien. ¿Con cuál ves más cómodo: el anterior o el nuevo?',
+  'Pasamos a otro par de lentes. Decime… ¿preferís el lente anterior o el que tenés ahora?'
+];
+
+function mensajeAgudezaLetraPantalla() {
+  const idx = estadoExamen.contadoresCopy.agudezaPreguntas++;
+  return elegirVariante(MSG_AGUDEZA_LETRA_PANTALLA_VARIANTES, idx);
+}
+
+function mensajePostComparacionLentes() {
+  const idx = estadoExamen.contadoresCopy.postComparacion++;
+  return elegirVariante(MSG_POST_COMPARACION_LENTES_VARIANTES, idx);
+}
+
+function mensajeComparacionLentes() {
+  const idx = estadoExamen.contadoresCopy.comparacionLentes++;
+  return elegirVariante(MSG_COMPARACION_LENTES_VARIANTES, idx);
+}
+
+function mensajeBinocPreguntaCombinada() {
+  const idx = estadoExamen.contadoresCopy.comparacionBinoc++;
+  return elegirVariante(MSG_BINOC_PREGUNTA_COMBINADA_VARIANTES, idx);
+}
+
 /**
  * Tras agudeza alcanzada en un ojo, el primer esferico_grueso del otro ojo requiere adaptación + pre-grueso visual.
  */
@@ -1206,8 +1270,6 @@ const AGUDEZA_ESPERA_ENTRE_LETRAS_SEG = 2;
 /** Tiempo con la letra en pantalla antes de que el agente pregunte. */
 const AGUDEZA_ESPERA_TRAS_TV_SEG = 3;
 
-const MSG_AGUDEZA_LETRA_PANTALLA = 'Mirá la pantalla. Decime qué letra ves.';
-
 function pasosTvYLecturaAgudeza(letra, logmar, ordenInicial) {
   return [
     { tipo: 'tv', orden: ordenInicial, letra, logmar },
@@ -1219,7 +1281,7 @@ function pasosTvYLecturaAgudeza(letra, logmar, ordenInicial) {
     {
       tipo: 'hablar',
       orden: ordenInicial + 2,
-      mensaje: MSG_AGUDEZA_LETRA_PANTALLA
+      mensaje: mensajeAgudezaLetraPantalla()
     }
   ];
 }
@@ -1771,8 +1833,6 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
   };
 }
 
-/** Tras una comparación de lentes: el agente repite este texto literal (única versión). */
-const MSG_POST_COMPARACION_LENTES = 'Sigamos con este.';
 const POST_COMPARACION_ESPERA_SEG = 3;
 
 function lensValorCerca(a, b) {
@@ -1790,7 +1850,7 @@ function comparacionParametroEsNoOp(tipoTest, valorEnCara, valorSiguiente) {
 }
 
 /**
- * §4.4: pausa 3s + Sigamos + deferred solo si aplica (p. ej. hubo reanclaje, anterior/igual con cambio; no en P1 actual+cambio ni P2 no-op).
+ * §4.4: pausa 3s + ritual post-comparación (C11) + deferred solo si aplica (p. ej. hubo reanclaje, anterior/igual con cambio; no en P1 actual+cambio ni P2 no-op).
  */
 function necesitaRitualSigamosPostComparacionLentes({
   pasosReanchorLen,
@@ -1879,7 +1939,7 @@ function generarPasosSoloForopteroComparacion(ojo, tipoTest, valorParametro) {
 }
 
 /**
- * Tras "Sigamos con este.", la siguiente llamada sin respuesta ejecuta lentes + pregunta pendientes.
+ * Tras ritual post-comparación (postComparacionContinuar), la siguiente llamada sin respuesta ejecuta lentes + pregunta pendientes.
  */
 async function ejecutarDeferredPostComparacionSiHay() {
   const def = estadoExamen.deferredPostComparacion;
@@ -2013,7 +2073,7 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
           estadoExamen.deferredPostComparacion = { kind: 'ETAPA_5_RITUAL_INTER_TEST_COMPLETAR' };
           return {
             ok: true,
-            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            pasos: [{ tipo: 'hablar', orden: 1, mensaje: mensajePostComparacionLentes() }],
             contexto: {
               etapa: estadoExamen.etapa,
               testActual: estadoExamen.secuenciaExamen.testActual,
@@ -2112,7 +2172,7 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
 
           return {
             ok: true,
-            pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+            pasos: [{ tipo: 'hablar', orden: 1, mensaje: mensajePostComparacionLentes() }],
             contexto: {
               etapa: estadoExamen.etapa,
               testActual,
@@ -2210,7 +2270,7 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
             estadoExamen.deferredPostComparacion = { kind: 'ETAPA_6_GENERAR' };
             return {
               ok: true,
-              pasos: [{ tipo: 'hablar', orden: 1, mensaje: MSG_POST_COMPARACION_LENTES }],
+              pasos: [{ tipo: 'hablar', orden: 1, mensaje: mensajePostComparacionLentes() }],
               contexto: {
                 etapa: 'ETAPA_6',
                 testActual: estadoExamen.secuenciaExamen.testActual,
@@ -2835,8 +2895,6 @@ function generarPasosMostrarLenteCilindricoAngulo(ojo, valorAngulo, letra, logma
  */
 function generarPasosEtapa5() {
   const testActual = estadoExamen.secuenciaExamen.testActual;
-  const mensajePreguntaComparacion = 'Ves mejor con este o con el anterior?';
-  
   // Validar que estamos en test de lentes
   if (!testActual || (testActual.tipo !== 'esferico_grueso' && testActual.tipo !== 'esferico_fino' && testActual.tipo !== 'cilindrico' && testActual.tipo !== 'cilindrico_angulo')) {
     return {
@@ -2997,16 +3055,9 @@ function generarPasosEtapa5() {
   
   // Generar pasos según la fase de comparación
   if (estado.faseComparacion === 'iniciando') {
-    // Fase inicial: mensaje introductorio (solo esférico grueso) + mostrar valorMas + pregunta estándar
-    let ordenInicial = 1;
-    if (tipo === 'esferico_grueso') {
-      pasos.push({
-        tipo: 'hablar',
-        orden: ordenInicial++,
-        mensaje: 'Ahora te voy a mostrar otro lente y me vas a decir si ves mejor o peor'
-      });
-    }
-    
+    // Fase inicial: mostrar valorMas + pregunta comparativa (sin intro aparte en esférico grueso)
+    const ordenInicial = 1;
+
     // Generar pasos para mostrar valorMas según el tipo de test
     let pasosMostrar;
     if (tipo === 'cilindrico') {
@@ -3042,7 +3093,7 @@ function generarPasosEtapa5() {
     pasos.push({
       tipo: 'hablar',
       orden: pasos.length + 1,
-      mensaje: mensajePreguntaComparacion
+      mensaje: mensajeComparacionLentes()
     });
     
   } else if (estado.faseComparacion === 'mostrando_alternativo') {
@@ -3050,7 +3101,7 @@ function generarPasosEtapa5() {
     pasos.push({
       tipo: 'hablar',
       orden: 1,
-      mensaje: mensajePreguntaComparacion
+      mensaje: mensajeComparacionLentes()
     });
     
     estado.faseComparacion = 'preguntando';
@@ -3063,7 +3114,7 @@ function generarPasosEtapa5() {
         {
           tipo: 'hablar',
           orden: 1,
-          mensaje: mensajePreguntaComparacion
+          mensaje: mensajeComparacionLentes()
         }
       ],
       contexto: {
@@ -3502,11 +3553,6 @@ const FB_CIL_MOSTRAR = 'binoc_cil_aplicar_variante';
 const FB_CIL_PREG = 'binoc_cil_preguntando';
 const FB_TRANS_LISTO = 'binoc_transicion_esperando_listo';
 
-const MSG_BINOC_PRE_CAMBIO =
-  'Ahora vamos a usar otro par de lentes, y me vas a decir si ves mejor o peor.';
-const MSG_BINOC_PREGUNTA = '¿Ves mejor con la configuración anterior o con la actual?';
-/** Un solo turno: variante ya aplicada; el paciente compara con la configuración previa. */
-const MSG_BINOC_PREGUNTA_COMBINADA = `${MSG_BINOC_PRE_CAMBIO} ${MSG_BINOC_PREGUNTA}`;
 const MSG_BINOC_TRANSICION =
   'Ahora vamos a ver con ambos ojos, tomate tu tiempo y avisame cuando estés listo.';
 const MSG_BINOC_REINTENTO_LISTO =
@@ -3812,7 +3858,7 @@ function generarPasosEtapa6() {
     });
     pasos.push({ tipo: 'esperar_foroptero', orden: 2 });
     pasos.push(tvPaso(3));
-    pasos.push({ tipo: 'hablar', orden: 4, mensaje: MSG_BINOC_PREGUNTA_COMBINADA });
+    pasos.push({ tipo: 'hablar', orden: 4, mensaje: mensajeBinocPreguntaCombinada() });
     estadoActual.faseBinocular = FB_ESF_PREG;
   } else if (fase === FB_ESF_PREG) {
     return {
@@ -3832,7 +3878,7 @@ function generarPasosEtapa6() {
     });
     pasos.push({ tipo: 'esperar_foroptero', orden: 2 });
     pasos.push(tvPaso(3));
-    pasos.push({ tipo: 'hablar', orden: 4, mensaje: MSG_BINOC_PREGUNTA_COMBINADA });
+    pasos.push({ tipo: 'hablar', orden: 4, mensaje: mensajeBinocPreguntaCombinada() });
     estadoActual.faseBinocular = FB_CIL_PREG;
   } else if (fase === FB_CIL_PREG) {
     return {
