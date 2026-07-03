@@ -1,10 +1,10 @@
 # Plan de implementación — Feedback cliente (examen visual)
 
-**Versión:** 1.2  
-**Fecha:** 2026-07-01  
-**Estado:** **Puntos 1–2 cerrados (implementado + QA OK)** — Puntos 3–4 pendientes  
+**Versión:** 1.3  
+**Fecha:** 2026-07-03  
+**Estado:** **Puntos 1–4 cerrados (implementado + QA OK)** — Puntos 5–6 pendientes (medición + firmware)  
 **Proyecto:** `openai-realtime-agents-main-2`  
-**Alcance:** Planificación y registro de entregas. **Punto 1** (`14c2768`, `54c1ef0`); **Punto 2** (`b1bb8fa`).
+**Alcance:** Planificación y registro de entregas. **Punto 1** (`14c2768`, `54c1ef0`); **Punto 2** (`b1bb8fa`); **Punto 3** (`a20b305`); **Punto 4** (`f30ee41`).
 
 ---
 
@@ -19,6 +19,7 @@
    - [2.4 Ítem 2 — Valor esférico](#24-ítem-2--valor-esférico-en-etapa-cilíndrica)
      - [2.4.5 Implementación y cierre (Punto 2)](#245-implementación-y-cierre-punto-2)
    - [2.5 Ítem 3 — Velocidad / foróptero](#25-ítem-3--velocidad--fluidez-del-foróptero)
+     - [2.5.10 Implementación y cierre (Punto 4)](#2510-implementación-y-cierre-punto-4--fase-a)
    - [2.6 Ítem 4 — Cilíndrico siempre](#26-ítem-4--examen-cilíndrico-siempre)
 3. [Mapa del sistema actual](#3-mapa-del-sistema-actual)
 4. [Evidencia de campo — registros CSV](#4-evidencia-de-campo--registros-csv)
@@ -26,6 +27,7 @@
    - [4.0.2 examen-registro-9 — QA Punto 1 OK](#402-examen-registro-9--qa-punto-1-ok-post-fix)
    - [4.0.3 examen-registro-10 — QA Punto 2 OK](#403-examen-registro-10--qa-punto-2-ok-post-fix)
    - [4.0.4 examen-registro-11 — QA Punto 3 OK](#404-examen-registro-11--qa-punto-3-ok-post-fix)
+   - [4.0.5 examen-registro-13 — QA Punto 4 OK](#405-examen-registro-13--qa-punto-4-ok-post-fix)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -41,15 +43,16 @@ El cliente reportó cuatro problemas de experiencia clínica durante el examen a
 |---|----------|----------------|---------------------|
 | 1 | Hay que decir "Bien"/"listo" para que avance tras Sigamos | Agente Realtime (no encadena tool call) | Alta — **cerrado §2.3.8** |
 | 2 | Error en valor esférico: no se usa el resultado esférico al pasar a cilíndrico | Backend (`motorExamen.js`) | Alta — **cerrado §2.4.5** |
-| 3 | El movimiento del foróptero para lentes esféricos debería ser más rápido | Firmware ESP32 + posible backend | Media — percepción de lentitud |
+| 3 | El movimiento del foróptero para lentes esféricos debería ser más rápido | Firmware ESP32 + backend (Fase A cerrada) | Media — **Fase A cerrada §2.5.10**; Fase B pendiente |
 | 4 | El examen cilíndrico debe realizarse siempre, no condicionado a ciertos valores | Backend (secuencia del examen) | Alta — **cerrado §2.6, §4.0.4** |
 
-**Estado por ítem (v1.2):**
+**Estado por ítem (v1.3):**
 
 - **Bug 1** (ítem 1) **implementado y QA OK** (§2.3.8, §4.0.2): tras `Sigamos con este.` el examen avanza **sin** input del paciente vía `auto_chain` + señal `__POST_COMPARACION_CONTINUAR__`. Pre-fix: `examen-registro-6.csv` (§4.0). Regresión intermedia: `examen-registro-8` (§4.0.1). **Evidencia post-fix:** `registros-examen/examen-registro-9.csv`.
 - **Bug 2** (ítem 2) **implementado y QA OK** (§2.4.5, §4.0.3): esfera confirmada (incl. **0.00 D**) se usa en toda configuración cilíndrica vía `calcularValoresFinalesForoptero`. Pre-fix: `examen-registro-5.csv`, `examen-registro-7.csv` (§4.1, §4.1.1). **Evidencia post-fix:** `registros-examen/examen-registro-10.csv` (commit `b1bb8fa`).
 - **Bug 4** (ítem 4) **implementado y QA OK** (§2.6, §4.0.4): test `cilindrico` siempre por ojo; modo `cilindricoSecuencialBajo` para bases `0` / `−0,25`. Pre-fix: `examen-registro-5.csv` (§4.2). **Evidencia post-fix:** `registros-examen/examen-registro-11.csv` (commit `a20b305`).
-- El ítem **3** combina **preajuste bilateral + transición R→L simplificada** (backend) con **velocidad esférica −50 %** en grueso: **7 s → 3,5 s / 0,50 D** (Q5; §2.5.3).
+- **Ítem 3 — Fase A** (preajuste bilateral + R→L) **implementado y QA OK** (§2.5.10, §4.0.5): ETAPA_3 posiciona ambos ojos; transición OD→OI solo oclusión. Pre-fix: `examen-registro-5.csv` (§4, salto 19:12:32). **Evidencia post-fix:** `registros-examen/examen-registro-13.csv` (commit `f30ee41`).
+- **Ítem 3 — Fase B** (velocidad esférica −50 % en grueso: **7 s → 3,5 s / 0,50 D**, Q5) — **pendiente** (Puntos 5–6; §2.5.7).
 
 ---
 
@@ -401,13 +404,13 @@ Archivo principal: `reference/foroptero-server/motorExamen.js`
 
 | ID | Tarea | Detalle |
 |----|-------|---------|
-| A1 | Preajuste en `generarPasosEtapa3()` | Incluir `L: { esfera, cilindro, angulo, occlusion: 'close' }` en el primer comando |
-| A2 | Flag de estado | Añadir p. ej. `estadoExamen.lentesPreajustadasBilateral = true` tras ETAPA_3 |
-| A3 | Simplificar bundle R→L | En `debeEmitirBundleAdaptacion` (bloque ~2826): si `lentesPreajustadasBilateral`, emitir **solo oclusión** en R y L; no reenviar esfera/cilindro/ángulo de L desde `valoresRecalculados` |
-| A4 | Copy transición OI | **Cerrada:** constante `MSG_PRE_GRUESO_OI_SOLO_OCLUSION` — *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* Usar cuando el bundle R→L es solo oclusión (preajuste activo). Mantener `MSG_PRE_GRUESO_OI` actual como fallback sin preajuste. |
-| A5 | Agudeza alcanzada → OI | Verificar que `generarPasosEtapa4` al cerrar OD no dispare recomando completo de L al avanzar test |
-| A6 | Caso borde: refinamientos OD | Tras tests de R, R queda en valores **refinados** (≠ recalculados). OI sigue en recalculados hasta su propio grueso — **correcto**; la transición no debe resetear R ni L |
-| A7 | Reinicio / modos test | Propagar flag en `reiniciarExamen()` y modos `testesf` / `testcil` si aplica |
+| A1 | Preajuste en `generarPasosEtapa3()` | Incluir `L: { esfera, cilindro, angulo, occlusion: 'close' }` en el primer comando — ✅ `f30ee41` |
+| A2 | Flag de estado | Añadir `estadoExamen.lentesPreajustadasBilateral = true` tras ETAPA_3 — ✅ |
+| A3 | Simplificar bundle R→L | En `debeEmitirBundleAdaptacion`: si `lentesPreajustadasBilateral`, emitir **solo oclusión** en R y L — ✅ |
+| A4 | Copy transición OI | `MSG_PRE_GRUESO_OI_SOLO_OCLUSION` — *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* — ✅ |
+| A5 | Agudeza alcanzada → OI | Verificar que `generarPasosEtapa4` no recomanda L completo — ✅ |
+| A6 | Caso borde: refinamientos OD | Transición no resetea R ni L — ✅ registro-13 |
+| A7 | Reinicio / modos test | Propagar flag en `inicializarExamen()` — ✅ |
 
 ##### 2.5.6.4 Estimación de mejora — transición R→L
 
@@ -537,17 +540,29 @@ Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.
 
 **Validación integrada (caso `examen-registro-5.csv`):**
 
-- [ ] Inicio: ambos ojos posicionados; primer test OD sin sorpresa.
-- [ ] Transición 19:12:32 equivalente: **solo oclusión**, < 10 s.
+- [x] Inicio: ambos ojos posicionados; primer test OD sin sorpresa. *(registro-13, §4.0.5)*
+- [x] Transición 19:12:32 equivalente: **solo oclusión**, < 10 s. *(registro-13: `<R> (close); <L> (open)` en 1 s)*
 - [ ] Comparativas esféricas OI: tiempo entre preguntas reducido vs registro original (post PR-3d).
 
 #### 2.5.9 Criterios de aceptación globales (ítem 3)
 
-- [ ] **Fase A:** cambio R→L sin recomando óptico de OI si preajuste activo.
-- [ ] **Fase A:** transición R→L < 10 s (caso registro §4).
+- [x] **Fase A:** cambio R→L sin recomando óptico de OI si preajuste activo.
+- [x] **Fase A:** transición R→L < 10 s (caso registro §4).
 - [ ] **Fase B:** esférico grueso ±0,50 D **≤ 3,5 s** por movimiento (O5; −50 % vs ~7 s baseline).
-- [ ] Sin regresión dióptrica, oclusión ni timeouts.
+- [x] Sin regresión dióptrica, oclusión ni timeouts. *(examen completo FINALIZADO, registro-13)*
 - [ ] Inicio ETAPA_3: copy alineado al acomodo bilateral (una sola expectativa de espera).
+
+#### 2.5.10 Implementación y cierre (Punto 4 — Fase A)
+
+**Estado:** ✅ **Implementado y probado (QA OK)** — 2026-07-03.
+
+**Commit:** `f30ee41` — `feat(etapa3): preajuste bilateral y transición R→L solo oclusión`
+
+**Archivo tocado:** `reference/foroptero-server/motorExamen.js` — preajuste bilateral en `generarPasosEtapa3`, flag `lentesPreajustadasBilateral`, bundle solo oclusión en `generarPasosEtapa5`, `MSG_PRE_GRUESO_OI_SOLO_OCLUSION`.
+
+**QA manual (post `f30ee41`):** examen completo con mismos valores que registro-11; inicio con R+L recalculados; transición OD→OI en **1 s** mecánico (solo oclusión); copy OI correcto; Puntos 2–3 sin regresión. **Resultado: OK.** Evidencia CSV: `registros-examen/examen-registro-13.csv` (§4.0.5).
+
+**Gate Punto 5:** ✅ cumplido — se puede iniciar medición baseline M1–M4.
 
 ---
 
@@ -873,6 +888,44 @@ Los huecos Oftalmologo → Foróptero tras cada Sigamos **no muestran** fila `Pa
 
 **Resultado:** ✅ **QA Punto 3 cerrado** con evidencia CSV archivada.
 
+### 4.0.5 `examen-registro-13` — QA Punto 4 OK (post-fix)
+
+**Archivo:** `registros-examen/examen-registro-13.csv`  
+**Sesión:** 2026-07-03, 10:15–10:29 (exportado 10:29)  
+**Valores iniciales:** `<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20`  
+**Valores recalculados:** `<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20`  
+**Estado al exportar:** FINALIZADO  
+**Contexto:** prueba tras commit `f30ee41` (preajuste bilateral ETAPA_3 + transición R→L solo oclusión).
+
+**Criterio Punto 4 — Preajuste bilateral al inicio (A1):**
+
+| Timestamp | Evento | Foróptero |
+|-----------|--------|-----------|
+| 10:15:32 | **ETAPA_3** primer comando | `<R> Esf +0.25 / Cil +0.00 / (open); <L> Esf +0.50 / Cil -1.00 / @20° / (close)` ✓ |
+
+Durante todo el bloque OD (líneas 15–82): L permanece `(close)` sin cambios ópticos; solo R se mueve en comparativas ✓
+
+**Criterio Punto 4 — Transición R→L solo oclusión (A3):**
+
+| Timestamp | Evento | Foróptero | Δ vs pre-fix |
+|-----------|--------|-----------|--------------|
+| 10:20:41 | Fin agudeza OD → inicio OI | `<R> (close); <L> (open)` ✓ | registro-5 (19:12:32): `<L> Esf +0.50 / Cil -1.00 / @20° / (open)` ❌ |
+| 10:20:42 | Copy OI | *"Tomate tu tiempo y decime si ves bien."* ✓ | Sin "esperemos que se ajusten los lentes" |
+
+**Tiempo mecánico transición:** comando foróptero 10:20:41 → TV 10:20:42 = **~1 s** (< 10 s, criterio §2.5.6.4).
+
+**Resultados al cierre (smoke Puntos 2–3):**
+
+| Test | R (OD) | L (OI) |
+|------|--------|--------|
+| Esférico fino | 0 | 0 |
+| Cilíndrico | **−0.25** | **−0.50** |
+| Agudeza alcanzada | 0 | 0.3 |
+
+Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` (modo secuencial). Examen completo OD + OI + binocular sin errores.
+
+**Resultado:** ✅ **QA Punto 4 cerrado** con evidencia CSV archivada.
+
 ---
 
 ### 4.1 `examen-registro-5.csv` — Bug 2 confirmado
@@ -969,7 +1022,7 @@ En OI (cilindro recalculado **-1.00**) sí se ejecutó cilíndrico → resultado
 | 1 | **Bug 1** — Agente espera respuesta post-Sigamos | ✅ **Cerrado** (§2.3.8) |
 | 2 | **Ítem 2** — Valor esférico | ✅ **Cerrado** (§2.4.5) |
 | 3 | **Ítem 4** — Cilíndrico siempre | ✅ **Cerrado** (§2.6, §4.0.4) |
-| 4 | **Ítem 3a** — Preajuste bilateral + R→L | Fluidez mecánica |
+| 4 | **Ítem 3a** — Preajuste bilateral + R→L | ✅ **Cerrado** (§2.5.10, §4.0.5) |
 | 5 | **Medición baseline** — M1–M4 | Obligatoria antes de firmware (Q5) |
 | 6 | **Ítem 3b** — Velocidad esférica firmware | Tras baseline documentado |
 
@@ -980,7 +1033,7 @@ En OI (cilindro recalculado **-1.00**) sí se ejecutó cilíndrico → resultado
 1. ~~`fix(agente): encadenar obtenerEtapa tras postComparacionContinuar`~~ — **Punto 1 cerrado** (`14c2768`, `54c1ef0`)
 2. ~~`fix(esfera): usar resultado esférico confirmado en etapa cilíndrica`~~ — **Punto 2 cerrado** (`b1bb8fa`)
 3. ~~`feat(secuencia): incluir test cilíndrico siempre`~~ — **Punto 3 cerrado** (`a20b305`)
-4. `feat(etapa3): preajuste bilateral + transición R→L solo oclusión` — Punto 4
+4. ~~`feat(etapa3): preajuste bilateral + transición R→L solo oclusión`~~ — **Punto 4 cerrado** (`f30ee41`)
 5. *(sin PR — medición en banco)* — Punto 5
 6. `perf(firmware): perfil de velocidad esférica escalonado` — Punto 6
 
@@ -1061,22 +1114,24 @@ Cada entrega sigue el mismo ciclo:
 
 ---
 
-#### Punto 4 — Ítem 3a: preajuste bilateral + transición R→L
+#### Punto 4 — Ítem 3a: preajuste bilateral + transición R→L ✅ CERRADO
 
-**Implementar:** ETAPA_3 posiciona ambos ojos; cambio R→L = solo oclusión (§2.5.6).
+**Implementado:** `reference/foroptero-server/motorExamen.js` — preajuste bilateral ETAPA_3, `lentesPreajustadasBilateral`, bundle solo oclusión R→L, `MSG_PRE_GRUESO_OI_SOLO_OCLUSION` (§2.5.10, commit `f30ee41`).
 
 **Por qué cuarto:** mejora mecánica; conviene con lógica clínica (Puntos 2–3) ya correcta.
 
 | Checklist QA | |
 |--------------|--|
-| [ ] Inicio: foróptero mueve R **y** L a recalculados (L ocluido) | |
-| [ ] Comparativas OD: solo se mueve R | |
-| [ ] Fin agudeza OD → inicio OI: transición **< 10 s**, sin recomando óptico grande de L | |
-| [ ] Copy OI (solo oclusión): agente dice *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* — no el `MSG_PRE_GRUESO_OI` con "esperemos que se ajusten los lentes" | |
-| [ ] Valores finales OD/OI correctos (Puntos 2–3 no regresan) | |
-| [ ] CSV: timestamp fin OD → primer foróptero OI vs registro-5 | |
+| [x] Inicio: foróptero mueve R **y** L a recalculados (L ocluido) | |
+| [x] Comparativas OD: solo se mueve R | |
+| [x] Fin agudeza OD → inicio OI: transición **< 10 s**, sin recomando óptico grande de L | |
+| [x] Copy OI (solo oclusión): agente dice *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* — no el `MSG_PRE_GRUESO_OI` con "esperemos que se ajusten los lentes" | |
+| [x] Valores finales OD/OI correctos (Puntos 2–3 no regresan) | |
+| [x] CSV: timestamp fin OD → primer foróptero OI vs registro-5 | |
 
-**Gate para Punto 5:** transición R→L claramente más corta.
+**Evidencia:** pre-fix `examen-registro-5.csv` (§4, 19:12:32); **post-fix OK** `examen-registro-13.csv` (§4.0.5).
+
+**Gate para Punto 5:** ✅ cumplido.
 
 ---
 
@@ -1122,7 +1177,7 @@ Cada entrega sigue el mismo ciclo:
 | 1 | `examen-registro-6.csv` | Gaps Oftalmologo → Foróptero post-Sigamos |
 | 2 | `examen-registro-10.csv` (+ registro-7 pre-fix) | Esfera al iniciar cilíndrico |
 | 3 | `examen-registro-11.csv` (+ registro-5 pre-fix) | Cilíndrico (R) con cil. 0; secuencial 2 pasos |
-| 4 | `examen-registro-5.csv` | Timestamp fin agudeza OD → foróptero OI |
+| 4 | `examen-registro-13.csv` (+ registro-5 pre-fix) | Preajuste bilateral inicio; transición R→L solo oclusión |
 | 5 | Cualquier examen esférico | Tiempos entre líneas Foróptero |
 | 6 | Nuevo export post-fix | ≤ 3,5 s / 0,50 D en grueso |
 
@@ -1157,9 +1212,9 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 
 | Riesgo | Ítem | Mitigación |
 |--------|------|------------|
-| Preajuste bilateral alarga inicio percibido | 3a | Copy claro; una sola espera; medir vs doble espera actual |
-| Oclusión L insuficiente con lentes pre-montadas | 3a | Verificación física en banco |
-| Transición R→L envía lentes completas por error | 3b | Flag `lentesPreajustadasBilateral` + tests |
+| Preajuste bilateral alarga inicio percibido | 3a | Copy claro; una sola espera; medir vs doble espera actual — **QA OK** registro-13 |
+| Oclusión L insuficiente con lentes pre-montadas | 3a | Verificación física en banco — **sin incidencia** en registro-13 |
+| Transición R→L envía lentes completas por error | 3b | Flag `lentesPreajustadasBilateral` + tests — **QA OK** registro-13 |
 | Aumentar velocidad de motores causa pérdida de pasos | 3b | Escalones ×1.25 → ×1.5 → ×2; banco 20 ciclos |
 | Cilíndrico con base 0 confunde al paciente | 4 | Algoritmo secuencial §2.6.3.1 (2 comparativas cortas) + copy clínico si hace falta |
 | Fix de `0.00` falsy revela otros bugs con valores borde | 2 | ✅ Cerrado — `calcularValoresFinalesForoptero` en generadores cilíndricos (§2.4.5) |
@@ -1196,10 +1251,12 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 - [x] Plan Fase A: preajuste + R→L simplificado §2.5.6
 - [x] Plan Fase B: velocidad esférica y modelo de impacto §2.5.7
 - [x] Objetivo Q5: esférico grueso **7 s → 3,5 s / 0,50 D** (−50 %)
-- [ ] Implementar A1–A7 (PR-3a, PR-3b)
+- [x] Implementar A1–A7 (PR-3a, PR-3b) — `f30ee41`
+- [x] QA manual Fase A: **OK** — `examen-registro-13.csv` archivado (§4.0.5)
+- [x] Gate Punto 5: cumplido
 - [ ] Medición baseline M1–M4 (PR-3c)
 - [ ] Firmware escalonado B1–B4 (PR-3d)
-- [ ] Validación integrada con `examen-registro-5.csv`
+- [ ] Validación integrada Fase B con `examen-registro-5.csv`
 
 ### Sesión — Ítem 4 (Cilíndrico siempre) — Punto 3 ✅ CERRADO
 - [x] Caso reproducible: `examen-registro-5.csv` §4.2
@@ -1226,6 +1283,7 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-9.csv`** — QA Punto 1 OK post-fix (§4.0.2)
   - **`examen-registro-10.csv`** — QA Punto 2 OK post-fix (§4.0.3)
   - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
+  - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5)
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales
@@ -1236,4 +1294,4 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 
 ---
 
-*Próximo paso: **Punto 4** (§5.1) — preajuste bilateral + transición R→L solo oclusión; QA acotado; exportar CSV; OK antes de Punto 5.*
+*Próximo paso: **Punto 5** (§5.1) — medición baseline M1–M4 en banco; anotar resultados; OK antes de Punto 6 (firmware).*

@@ -202,7 +202,7 @@ Configuración del agente AI conversacional.
   - **Test cilíndrico (potencia):** siempre incluido por ojo
   - **Test cilíndrico ángulo:** solo si cilindro recalculado entre -2.00 y -6.00 (inclusive)
   - Bases `0` / `-0.25`: comparativa secuencial en 2 pasos (§2.6.3.1 en `PLAN_FEEDBACK_CLIENTE_EXAMEN.md`)
-- Configura foróptero inicial (R abierto, L cerrado)
+- Configura foróptero inicial con **preajuste bilateral** (Punto 4, `f30ee41`): R y L a valores recalculados; L ocluido. La transición OD→OI tras `agudeza_alcanzada` R envía solo cambio de oclusión (`R: close`, `L: open`) si `lentesPreajustadasBilateral` está activo
 - Inicializa `testActual` con el primer test de la secuencia
 - **Transición de etapa:** `estadoExamen.etapa = mapearTipoTestAEtapa(testActual.tipo)` (no forzar siempre ETAPA_4; el primer test puede ser lentes o binocular en modos de prueba)
 

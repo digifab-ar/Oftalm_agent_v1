@@ -1,0 +1,185 @@
+exportado_en,2026-07-03 10:29:10
+zona_horaria,America/Argentina/Buenos_Aires
+etapa_actual,FINALIZADO
+modo_examen,normal
+Valores iniciales,"<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20"
+Valores recalculados,"<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20"
+Timestamp,Origen,Detalle
+2026-07-03 10:15:12,Oftalmologo,"Hola, escribí los valores del autorefractómetro antes de iniciar el test. Ejemplo de formato: <R> +0.75 , -1.75 , 60 / <L> +2.75 , 0.00 , 0"
+2026-07-03 10:15:32,Paciente,"<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20"
+2026-07-03 10:15:32,Foroptero-TV,<R> Esf +0.25 / Cil +0.00 / (open); <L> Esf +0.50 / Cil -1.00 / @20° / (close)
+2026-07-03 10:15:55,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:15:55,Oftalmologo,"Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes y luego decime si ves bien."
+2026-07-03 10:16:10,Paciente,veo bien
+2026-07-03 10:16:10,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""H""}"
+2026-07-03 10:16:10,Foroptero-TV,<R> Esf +0.75 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:16:19,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:16:20,Oftalmologo,Ahora te voy a mostrar otro lente y me vas a decir si ves mejor o peor
+2026-07-03 10:16:20,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:16:26,Paciente,con el anterior
+2026-07-03 10:16:26,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:16:26,Foroptero-TV,<R> Esf +0.25 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:16:39,Oftalmologo,Sigamos con este.
+2026-07-03 10:16:43,Foroptero-TV,<R> Esf -0.25 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:16:52,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:16:52,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:16:58,Paciente,con el anterior
+2026-07-03 10:16:58,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:16:58,Foroptero-TV,<R> Esf +0.25 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:17:10,Oftalmologo,Sigamos con este.
+2026-07-03 10:17:14,Foroptero-TV,<R> Esf +0.50 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:17:20,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:17:21,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:17:29,Paciente,con el anterior
+2026-07-03 10:17:29,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:17:29,Foroptero-TV,<R> Esf +0.25 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:17:37,Oftalmologo,Sigamos con este.
+2026-07-03 10:17:41,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:17:44,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:17:47,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:17:47,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:17:52,Paciente,con este
+2026-07-03 10:17:52,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""actual"",""confianza"":null}"
+2026-07-03 10:17:52,Foroptero-TV,<R> Esf +0.25 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:17:52,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:17:52,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:18:08,Paciente,con el anterior
+2026-07-03 10:18:08,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:18:08,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:18:17,Oftalmologo,Sigamos con este.
+2026-07-03 10:18:20,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:18:23,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:18:23,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:18:41,Paciente,con el anterior
+2026-07-03 10:18:41,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:18:41,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> (close)
+2026-07-03 10:18:47,Oftalmologo,Sigamos con este.
+2026-07-03 10:18:51,Foroptero-TV,<R> Esf +0.00 / Cil -0.50 / @175° / (open); <L> (close)
+2026-07-03 10:18:54,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:18:54,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:19:02,Paciente,con el anterior
+2026-07-03 10:19:02,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:19:02,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:19:03,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:19:06,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:19:48,Paciente,h
+2026-07-03 10:19:48,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""H""}"
+2026-07-03 10:19:48,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:19:49,Foroptero-TV,TV: letra V @ logMAR 0.2
+2026-07-03 10:19:52,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:20:01,Paciente,v
+2026-07-03 10:20:01,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""V""}"
+2026-07-03 10:20:01,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:20:02,Foroptero-TV,TV: letra R @ logMAR 0.1
+2026-07-03 10:20:05,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:20:11,Paciente,r
+2026-07-03 10:20:11,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""R""}"
+2026-07-03 10:20:11,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:20:12,Foroptero-TV,TV: letra C @ logMAR 0
+2026-07-03 10:20:15,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:20:30,Paciente,c
+2026-07-03 10:20:30,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""C""}"
+2026-07-03 10:20:30,Foroptero-TV,<R> Esf +0.00 / Cil -0.25 / @175° / (open); <L> (close)
+2026-07-03 10:20:30,Foroptero-TV,TV: letra K @ logMAR 0
+2026-07-03 10:20:34,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:20:41,Paciente,k
+2026-07-03 10:20:41,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""K""}"
+2026-07-03 10:20:41,Foroptero-TV,<R> (close); <L> (open)
+2026-07-03 10:20:42,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:20:42,Oftalmologo,Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien.
+2026-07-03 10:20:53,Paciente,veo bien
+2026-07-03 10:20:53,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""H""}"
+2026-07-03 10:20:53,Foroptero-TV,<R> (close); <L> Esf +1.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:20:53,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:20:54,Oftalmologo,Ahora te voy a mostrar otro lente y me vas a decir si ves mejor o peor
+2026-07-03 10:20:54,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:21:08,Paciente,con el anterior
+2026-07-03 10:21:08,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:21:08,Foroptero-TV,<R> (close); <L> Esf +0.50 / Cil -1.00 / @20° / (open)
+2026-07-03 10:21:12,Oftalmologo,Sigamos con este.
+2026-07-03 10:21:23,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:21:32,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:21:32,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:21:54,Paciente,con este
+2026-07-03 10:21:54,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""actual"",""confianza"":null}"
+2026-07-03 10:21:54,Foroptero-TV,<R> (close); <L> Esf +0.50 / Cil -1.00 / @20° / (open)
+2026-07-03 10:22:04,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:22:04,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:22:17,Paciente,con el anterior
+2026-07-03 10:22:17,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:22:17,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:22:20,Oftalmologo,Sigamos con este.
+2026-07-03 10:22:31,Foroptero-TV,<R> (close); <L> Esf +0.25 / Cil -1.00 / @20° / (open)
+2026-07-03 10:22:37,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:22:37,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:23:03,Paciente,con el anterior
+2026-07-03 10:23:03,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:23:03,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:23:12,Oftalmologo,Sigamos con este.
+2026-07-03 10:23:16,Foroptero-TV,<R> (close); <L> Esf -0.25 / Cil -1.00 / @20° / (open)
+2026-07-03 10:23:21,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:23:21,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:23:50,Paciente,con el anterior
+2026-07-03 10:23:50,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:23:50,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:23:58,Oftalmologo,Sigamos con este.
+2026-07-03 10:24:02,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:24:03,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:24:03,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:24:24,Paciente,con este
+2026-07-03 10:24:24,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""actual"",""confianza"":null}"
+2026-07-03 10:24:24,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:24:28,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:24:28,Oftalmologo,Ves mejor con este o con el anterior?
+2026-07-03 10:24:45,Paciente,con el anterior
+2026-07-03 10:24:45,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:24:45,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:24:46,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:24:49,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:25:06,Paciente,h
+2026-07-03 10:25:06,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""H""}"
+2026-07-03 10:25:06,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:25:07,Foroptero-TV,TV: letra C @ logMAR 0.2
+2026-07-03 10:25:10,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:25:31,Paciente,veo borroso
+2026-07-03 10:25:31,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""borroso"",""letraIdentificada"":null}"
+2026-07-03 10:25:31,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:25:32,Foroptero-TV,TV: letra N @ logMAR 0.3
+2026-07-03 10:25:35,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:25:54,Paciente,n
+2026-07-03 10:25:54,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""N""}"
+2026-07-03 10:25:54,Foroptero-TV,<R> (close); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:25:55,Foroptero-TV,TV: letra O @ logMAR 0.3
+2026-07-03 10:25:58,Oftalmologo,Mirá la pantalla. Decime qué letra ves.
+2026-07-03 10:26:12,Paciente,o
+2026-07-03 10:26:12,Interpretacion,"{""tipo"":""agudeza"",""resultado"":""correcta"",""letraIdentificada"":""O""}"
+2026-07-03 10:26:12,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:26:22,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:26:22,Oftalmologo,"Ahora vamos a ver con ambos ojos, tomate tu tiempo y avisame cuando estés listo."
+2026-07-03 10:27:48,Paciente,listo
+2026-07-03 10:27:48,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:27:49,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:27:49,Oftalmologo,"Ahora vamos a usar otro par de lentes, y me vas a decir si ves mejor o peor. ¿Ves mejor con la configuración anterior o con la actual?"
+2026-07-03 10:28:16,Paciente,con la anterior
+2026-07-03 10:28:16,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""anterior"",""confianza"":null}"
+2026-07-03 10:28:16,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+2026-07-03 10:28:20,Oftalmologo,Sigamos con este.
+2026-07-03 10:28:24,Foroptero-TV,<R> Esf +0.00 / Cil +0.00 / (open); <L> Esf +0.00 / Cil -0.50 / @20° / (open)
+2026-07-03 10:28:28,Foroptero-TV,TV: letra H @ logMAR 0.3
+2026-07-03 10:28:28,Oftalmologo,"Ahora vamos a usar otro par de lentes, y me vas a decir si ves mejor o peor. ¿Ves mejor con la configuración anterior o con la actual?"
+2026-07-03 10:28:36,Paciente,con la actual
+2026-07-03 10:28:36,Interpretacion,"{""tipo"":""comparacion"",""preferencia"":""actual"",""confianza"":null}"
+Test,Valor
+Agudeza inicial (R),0.3
+Esférico Grueso (R),0.25
+Esférico Fino (R),0
+Cilíndrico (R),-0.25
+Cilíndrico ángulo (R),pendiente
+Agudeza alcanzada (R),0
+Agudeza inicial (L),0.3
+Esférico Grueso (L),0
+Esférico Fino (L),0
+Cilíndrico (L),-0.5
+Cilíndrico ángulo (L),pendiente
+Agudeza alcanzada (L),0.3
+Binocular (B),R: Esf +0.00 / Cil +0.00 @ 0° / L: Esf +0.00 / Cil -0.50 @ 20°

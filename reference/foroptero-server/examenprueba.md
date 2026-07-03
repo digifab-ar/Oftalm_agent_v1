@@ -84,7 +84,7 @@ En **ETAPA_3** (`generarPasosEtapa3` en `motorExamen.js`):
 **Bug corregido (modos testesf / testcil / testbin):**  
 Antes, ETAPA_3 dejaba fijo `ETAPA_4` aunque el primer test fuera esférico, cilíndrico o binocular. El agente enviaba entonces `interpretacionAgudeza` y el backend respondía error. Con la etapa alineada al tipo de test, el agente usa `interpretacionComparacion` en ETAPA_5 y ETAPA_6.
 
-El resto de ETAPA_3 (comando foróptero inicial R abierto / L cerrado, espera, mensaje de “ojo derecho”) se mantiene; en modos que empiezan por test no-agudeza el mensaje puede ser genérico hasta que el motor refine textos por tipo de test.
+El resto de ETAPA_3: comando foróptero inicial con **preajuste bilateral** (R abierto y L con lentes recalculadas + oclusión cerrada), `lentesPreajustadasBilateral = true`, espera, mensaje de “ojo derecho”. En modos que empiezan por test no-agudeza el mensaje puede ser genérico hasta que el motor refine textos por tipo de test. Tras `agudeza_alcanzada` de OD, el primer `esferico_grueso` OI usa transición **solo oclusión** y `MSG_PRE_GRUESO_OI_SOLO_OCLUSION` (ver `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §4.0.5).
 
 ---
 
