@@ -12,7 +12,7 @@
 
 | # | Bug | Severidad | Causa raíz (1 línea) |
 |---|-----|-----------|----------------------|
-| **B1** | Sin posición inicial de comparación antes de cambiar lente (binocular) | Alta clínica / UX | La primera ronda esférica se ejecuta aunque la variante es **no-op**; no hay anclaje hardware explícito de `rxBasePaso` antes de `rxVariante` en cada ronda |
+| **B1** | Al entrar en binocular, la Rx del foróptero **no** coincide con los resultados monoculars | Alta clínica | `construirRxBaseBinocular` / `cilYAnguloOjo` exige cilindro **y** ángulo confirmados; si falta ángulo (`pendiente`), descarta el cilindro monocular y usa `valoresRecalculados` |
 | **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persiste resultados y avanza a `FINALIZADO` **sin** comando foróptero con la Rx elegida |
 | **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) | ✅ **Cerrado** (`a7ca9ad`, registro-14 §8) |
 
@@ -34,29 +34,41 @@
 
 ---
 
-### B1 — Sin posición inicial antes de cambiar lente (binocular)
+### B1 — Rx binocular de entrada ≠ resultados monoculars (monocular → binocular)
 
-**Síntoma:** El paciente recibe la pregunta comparativa «¿anterior o actual?» sin haber tenido un cambio de lente perceptible que establezca qué es «actual».
+**Síntoma:** Al abrir ambas oclusiones e iniciar ETAPA_6, el foróptero muestra una Rx que **no** refleja lo confirmado en los tests monoculars por ojo — en particular el **cilindro** de OI.
 
-**Evidencia en registro-13:**
+**Regla de negocio (DEFINICIONES §2.1):** la línea base binocular debe usar esférico fino confirmado por ojo y, para cilindro/eje, los resultados del test cilíndrico (y ángulo si hubo test de ángulo); solo si **no** hubo test cilíndrico, usar `valoresRecalculados`.
 
-| Timestamp | Línea CSV | Evento | Observación |
-|-----------|-----------|--------|-------------|
-| 10:26:12 | 156 | Foróptero baseline binocular: `R +0.00/+0.00`, `L +0.00/−1.00` | Línea base ETAPA_6 |
-| 10:26:22 | 158 | «Avisame cuando estés listo» | Transición §2.3 DEFINICIONES |
-| 10:27:48 | 159–160 | Paciente «listo»; foróptero **sin cambio** | Anclaje durante espera |
-| 10:27:49 | 161–162 | TV + pregunta «¿anterior o actual?» | **Primera comparación esférica** |
-| — | — | Entre 160 y 162 **no hay** línea Foróptero-TV con cambio de esfera | Ambas esferas ya eran 0 → variante esférica = no-op |
-| 10:28:16 | 163–165 | «con la anterior»; foróptero igual | Respuesta sin contraste físico previo |
-| 10:28:24 | 167 | **Primer cambio real** binocular: `L Cil −1.00 → −0.50` | Primera variante perceptible |
+**Evidencia principal — registro-14:**
 
-**Interpretación clínica:** La comparación esférica binocular fue **degenerada** (variante idéntica a la base). El paciente respondió «anterior/actual» sin que los lentes hubieran cambiado. La primera comparación con cambio físico fue la cilíndrica (~45 s después de «listo»).
+Resultados monoculars al cierre (CSV resumen):
 
-**Comportamiento esperado (según definiciones):**
+| Ojo | Esférico fino | Cilíndrico | Cilíndrico ángulo |
+|-----|---------------|------------|-------------------|
+| R | 0 | 0 | pendiente |
+| L | 0 | **−0,50** | pendiente |
 
-- §2.3: la fase «listo» establece la base inicial **solo para la primera ronda**.
-- §12.2: cada ronda aplica variante y pregunta; «anterior» = `rxBasePaso` del paso.
-- §7 / lógica no-op: si la variante esférica no mueve ningún ojo, **omitir** la ronda esférica y pasar directo a cilíndrico (análogo a `omitirCilindro` cuando ambos cil = 0).
+Inmediatamente antes, agudeza OI monocular (l. 140–155): foróptero con `L Cil −0.50` de forma consistente.
+
+**Salto monocular → binocular (l. 160):**
+
+```
+<R> Esf +0.00 / Cil +0.00 / (open); <L> Esf +0.00 / Cil -1.00 / @20° / (open)
+```
+
+| Ojo | Esperado (resultados monoculars + recalc solo para ángulo) | Observado l. 160 |
+|-----|--------------------------------------------------------------|------------------|
+| R | Esf 0, Cil 0, @175° recalc | Esf 0, Cil 0 ✓ |
+| L | Esf 0, Cil **−0,50**, @20° recalc | Esf 0, Cil **−1,00** ✗ |
+
+El **−1,00** coincide con `valoresRecalculados` del autorefractómetro, **no** con `Cilíndrico (L) = −0,50`.
+
+**Misma discrepancia en registro-13 (l. 156):** `L Cil −1.00` al entrar en binocular pese a resultado cilíndrico OI **−0,50**.
+
+**Efecto clínico:** el paciente termina agudeza monocular con un cilindro, abre ambos ojos y el dispositivo **salta** a otro cilindro antes de la fase «listo». La adaptación binocular arranca sobre una Rx incorrecta; las comparativas siguientes (p. ej. variante cilíndrica −1,00 → −0,50 en registro-14 l. 171) parten de una base errada.
+
+**Nota:** síntomas colaterales (pregunta esférica no-op tras «listo», texto «otro par» sin cambio) pueden confundir al paciente, pero **no** son el objeto de B1; desaparecen o atenúan cuando la base binocular es la Rx monocular correcta.
 
 ---
 
@@ -71,7 +83,7 @@ El registro-13 cierra la última ronda binocular con **«con la actual»** (lín
 | Escenario | Rx en cara al responder | Rx confirmada (`rxActiva`) | Foróptero post-confirmación |
 |-----------|-------------------------|----------------------------|-----------------------------|
 | Última ronda, «con la **actual**» | `rxVariante` (ej. L −0,50) | `rxVariante` | ✅ Coincide (caso registro-13) |
-| Última ronda, «con la **anterior**» | `rxVariante` (ej. L −0,50) | `rxBasePaso` (ej. L −1,00) | ❌ Sigue en −0,50 |
+| Última ronda, «con la **anterior**» | `rxVariante` (ej. L −0,50) | `rxBasePaso` (ej. L −1,00 si **B1** sin fix) | ❌ Sigue en −0,50 |
 
 **Contraste con ETAPA_5:** `confirmarResultado` para `cilindrico` **sí** llama a `ejecutarComandoForopteroInterno` con el valor final (aprox. líneas 3357–3378 de `motorExamen.js`). `confirmarResultadoBinocular` **no** tiene equivalente.
 
@@ -131,26 +143,44 @@ Al responder «anterior» en paso 2:
 
 ## 2. Causa raíz en código
 
-### B1 — Binocular: ronda esférica no-op + sin anclaje pre-variante
+### B1 — `construirRxBaseBinocular`: cilindro/ángulo «todo o nada»
 
-**Ubicación:** `motorExamen.js`
+**Ubicación:** `motorExamen.js` — `construirRxBaseBinocular()` (~3583), helper interno `cilYAnguloOjo()` (~3608).
 
-| Función | Problema |
-|---------|----------|
-| `iniciarBinocular()` (~3690) | Siempre fija `paso: 'esfera'` y calcula `rxVariante = aplicarVarianteEsferica(rxBase)` aunque sea idéntica a la base |
-| `generarPasosEtapa6()` (~3760–3769) | `FB_ESF_MOSTRAR` aplica `rxVariante` directamente; no detecta no-op ni salta a cilíndrico |
-| `procesarRespuestaBinocular()` (~3865) | Solo omite cilíndrico si `ambosCilindrosCero`; no omite esférico no-op |
-| `generarPasosEtapa6()` | No existe paso intermedio «solo `rxBasePaso` + pausa» antes de `rxVariante` (brecha documentada en `PLAN_REANCLAJE` §2.2) |
+**Lógica actual (incorrecta):**
+
+```javascript
+if (tieneCil && tieneAng) {
+  return { cilindro: res.cilindrico, angulo: res.cilindricoAngulo };
+}
+return { cilindro: recalc[ojo].cilindro, angulo: recalc[ojo].angulo };
+```
+
+Si `cilindricoAngulo` es `null` (`pendiente` — test de ángulo no implementado en secuencia normal), **descarta también** `cilindrico` confirmado y sustituye **ambos** campos por autorefractómetro.
+
+**Lógica correcta (ya existe en el mismo archivo):** `calcularValoresFinalesForoptero()` (~889) resuelve **campo por campo**:
+
+| Campo | Prioridad |
+|-------|-----------|
+| Esfera | `esfericoFino` → `esfericoGrueso` → recalc |
+| Cilindro | `cilindrico` → recalc |
+| Ángulo | `cilindricoAngulo` → recalc |
+
+Por eso agudeza monocular OI en registro-14 muestra **Cil −0,50** y la entrada binocular muestra **−1,00**: dos funciones distintas arman la misma Rx.
+
+**Caso R en registro-14 (no se nota el bug):** `cilindrico R = 0` y recalc `0` → el fallback da el mismo valor; enmascara el error en OD.
 
 **Cadena causal:**
 
 ```
-iniciarBinocular → rxVariante esférica === rxBase (ambas esferas = 0)
-→ FB_ESF_MOSTRAR no mueve foróptero
-→ MSG_BINOC_PREGUNTA_COMBINADA igualmente
-→ Paciente responde sin contraste físico
-→ Primera variante real recién en FB_CIL_MOSTRAR
+agudeza_alcanzada (L) termina → test binocular
+→ iniciarBinocular() → construirRxBaseBinocular()
+→ cilYAnguloOjo('L'): tieneCil=true (−0.5), tieneAng=false (pendiente)
+→ fallback completo → L cilindro = recalc −1.00
+→ foropteroDesdeRx en FB_TRANS_LISTO (l. 160 registro-14)
 ```
+
+**Especificación violada:** `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1 — usar resultado cilíndrico cuando el test se ejecutó; ángulo de recalc si no hubo test de ángulo.
 
 ---
 
@@ -202,8 +232,8 @@ estado.valorActual = resultado.valorAMostrar;
 | Orden | Bug | Motivo |
 |-------|-----|--------|
 | 1 | **B3** | Fix acotado, alta certeza, evidencia directa en registro-13 |
-| 2 | **B2** | Fix acotado, paridad con `confirmarResultado` ETAPA_5 |
-| 3 | **B1** | Requiere decisión de producto sobre skip no-op esférico vs. anclaje explícito |
+| 2 | **B1** | Fix acotado, paridad con `calcularValoresFinalesForoptero`; desbloquea base binocular correcta |
+| 3 | **B2** | Fix acotado, paridad con `confirmarResultado` ETAPA_5 |
 
 ---
 
@@ -277,38 +307,67 @@ Tras fix, al responder «anterior» en `FB_CIL_PREG`:
 
 ---
 
-### Fase 3 — B1: posición inicial binocular antes de cambiar lente
+### Fase 3 — B1: alinear Rx de entrada binocular con resultados monoculars
 
-**Archivos:** `motorExamen.js`, opcionalmente `DEFINICIONES_EXAMEN_BINOCULAR.md`
+**Archivos:** `reference/foroptero-server/motorExamen.js`, `DEFINICIONES_EXAMEN_BINOCULAR.md` (aclaración §2.1), `DOCUMENTACION.md` (ETAPA_6).
 
-**Decisión de producto requerida (D-B1):**
+**Decisión de producto (D-B1) — cerrada:**
 
-| Opción | Descripción | Pros | Contras |
-|--------|-------------|------|---------|
-| **A (recomendada)** | **Omitir ronda esférica** si `rxVariante` esférica es igual a `rxBasePaso` (no-op en ambos ojos) | Elimina pregunta sin sentido; alinea con §7 (omitir cil cuando ambos 0) | Hay que definir mensaje al paciente (¿silencioso o frase breve?) |
-| **B** | Insertar paso explícito: foróptero en `rxBasePaso` → pausa → variante → pregunta **en cada ronda** | Anclaje hardware claro | Más latencia; desvía de §12.2 actual |
-| **C** | Solo omitir pregunta si no-op; si hay cambio esférico en un ojo, mantener flujo actual | Mínimo cambio | No resuelve anclaje explícito pre-variante en rondas con cambio |
+| Tema | Decisión |
+|------|----------|
+| Cilindro confirmado + ángulo pendiente | Usar **`cilindrico`** del resultado monocular; **`angulo`** de `valoresRecalculados` (misma regla que `calcularValoresFinalesForoptero`) |
+| Esfera | Sin cambio: siempre `esfericoFino` confirmado (ya correcto en `construirRxBaseBinocular`) |
+| Test cilíndrico no ejecutado | Cilindro y ángulo de recalc (sin cambio semántico) |
+| Test cilíndrico **y** ángulo confirmados | Ambos de resultados (sin cambio) |
 
-**Tarea 3.1 — Implementar opción A**
+**Tarea 3.1 — Refactor `cilYAnguloOjo` (o reutilizar helper compartido)**
 
-1. Función `rxEsfericaVarianteEsNoOp(rxBase, rxVariante)` — comparar esferas R y L.
-2. En `iniciarBinocular()` o al procesar `FB_TRANS_LISTO → FB_ESF_MOSTRAR`:
-   - Si no-op: saltar a lógica equivalente a post-respuesta esférica «anterior» (`rxActiva = rxBase`, calcular variante cilíndrica, `paso = 'cilindro'`, `FB_CIL_MOSTRAR` o `confirmarResultadoBinocular` si también omitir cil).
-3. Si `ambosCilindrosCero` tras skip esférico → confirmar directo.
+Opción mínima — reemplazar el bloque «todo o nada» por resolución por campo:
 
-**Tarea 3.2 — Registro / telemetría**
-
-Exponer en `contexto.binocularEstado` flag `esferaOmitidaNoOp: true` para depuración y CSV.
-
-**Tarea 3.3 — QA con registro-13 equivalente**
-
-Verificar secuencia:
-
-```
-listo → (sin pregunta esférica) → variante cilíndrica L −0,50 → pregunta anterior/actual
+```javascript
+const cilindro =
+  res.cilindrico !== null && res.cilindrico !== undefined
+    ? res.cilindrico
+    : recalc[ojo].cilindro;
+const angulo =
+  res.cilindricoAngulo !== null && res.cilindricoAngulo !== undefined
+    ? res.cilindricoAngulo
+    : recalc[ojo].angulo;
+return { cilindro, angulo };
 ```
 
-**Evidencia:** CSV donde entre «listo» y primera pregunta comparativa haya **exactamente un** cambio de foróptero (cilíndrico), no cero.
+Opción preferida — extraer helper compartido (p. ej. `resolverCilindroYAnguloOjo(ojo)`) usado por **`construirRxBaseBinocular`** y **`calcularValoresFinalesForoptero`** para una sola fuente de verdad.
+
+**Tarea 3.2 — Documentación**
+
+- Aclarar en `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1 que cilindro y ángulo se resuelven **independientemente** (cilindro del test si existe; ángulo del test de ángulo si existe, si no recalc).
+- Actualizar `DOCUMENTACION.md` ETAPA_6 con la misma regla.
+
+**Tarea 3.3 — QA manual**
+
+Reproducir escenario registro-14 (cilíndrico OI −0,50, ángulo pendiente):
+
+| # | Verificación | Evidencia esperada en CSV |
+|---|--------------|---------------------------|
+| 1 | Tras última línea agudeza OI monocular | `L Cil −0.50` |
+| 2 | Primera línea binocular (ambos ojos open) | **Misma** Rx L: `Cil −0.50` (no −1,00) |
+| 3 | Fase «listo» | Sin cambio de cilindro respecto a l. 2 |
+| 4 | Variante cilíndrica binocular | Parte de **−0,50** → **0,00** (no de −1,00 → −0,50) |
+
+**Caso borde R:** cilindro 0 + ángulo pendiente → debe seguir en Cil 0 (regresión).
+
+**Caso borde futuro:** si se activa `cilindrico_angulo`, ambos campos desde resultados.
+
+**Evidencia objetivo:** exportar `examen-registro-15.csv` (o equivalente) archivado en `registros-examen/`.
+
+**Riesgo de regresión:** Bajo — alinea binocular con comportamiento ya validado en agudeza y ETAPA_5; modo `testbin` no usa `cilYAnguloOjo` (solo recalc).
+
+#### Anexo — temas fuera de alcance B1 (diferidos)
+
+| Tema | Estado |
+|------|--------|
+| Omitir ronda esférica binocular cuando variante esférica = no-op | Mejora UX opcional; no es la causa del salto L −0,50 → −1,00 |
+| Anclaje hardware explícito pre-variante en cada ronda | Cubierto por §2.3 «listo» + fix B1; ver `PLAN_REANCLAJE` si se redefine flujo |
 
 ---
 
@@ -333,8 +392,8 @@ Exportar `registros-examen/examen-registro-14.csv` (o siguiente número) con exa
 |---|--------------|-----|
 | 1 | OD cilíndrico base 0: paso 2 «anterior» → Cil **0,0** en resultados y foróptero | B3 | ✅ registro-14 |
 | 2 | Binocular última ronda «anterior» → foróptero = resultado guardado al `FINALIZADO` | B2 |
-| 3 | Binocular con ambas esferas 0: tras «listo», **no** pregunta esférica; primera pregunta tras cambio cilíndrico | B1 |
-| 4 | Binocular con esfera ≠ 0 en al menos un ojo: ronda esférica sigue funcionando | B1 regresión |
+| 3 | Entrada binocular: `L Cil −0,50` (resultado monocular) sin saltar a recalc `−1,00` | B1 |
+| 4 | Agudeza OI y línea 160 binocular: **misma** Rx L | B1 |
 | 5 | Cilíndrico bilateral normal (base ≤ −0,50) sin regresión | B3 regresión |
 | 6 | `postComparacionContinuar` / Sigamos entre comparativas intra-test intacto | Regresión |
 
@@ -366,12 +425,11 @@ sequenceDiagram
 
 | Documento | Relación |
 |-----------|----------|
-| `registros-examen/examen-registro-13.csv` | Evidencia pre-fix B3 (Cil R = −0,25); B1, B2 |
-| `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8) |
-| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6 | Cierre B3 en plan principal |
-| `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` §2.2, §4 | Brecha anclaje binocular pre-variante (B1) |
-| `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.3, §7, §12 | Transición listo; omisión pasos (B1/B2) |
-| `reference/foroptero-server/motorExamen.js` | ~2031–2038 (B3), ~3892 (B2), ~3690–3878 (B1) |
+| `registros-examen/examen-registro-13.csv` | Evidencia B1 (L Cil −1,00 al entrar binocular); B2 |
+| `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8); evidencia B1 (l. 160 vs 186) |
+| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6 | Cierre B3; cilíndrico ángulo pendiente en secuencia normal |
+| `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1 | Regla línea base; aclarar resolución independiente cil/ángulo (B1) |
+| `reference/foroptero-server/motorExamen.js` | ~3608–3618 (B1), ~889–908 (referencia correcta), ~2031–2038 (B3), ~3892 (B2) |
 
 ---
 
@@ -404,7 +462,7 @@ Protocolo replicado: esférico fino R → 0; cilíndrico base 0; paso 1 «con el
 | Esférico fino R | 0 | Sin regresión Punto 2 |
 | Cilíndrico L | −0.50 | Bracket ±0,50 normal (l. 125–135) |
 | Agudeza R / L | 0.2 / 0.2 | Examen completo FINALIZADO |
-| Binocular | R +0.00/+0.00; L −0.50 | B1/B2 siguen observables en ETAPA_6 (l. 163–175) — fuera de alcance B3 |
+| Binocular | R +0.00/+0.00; L −0.50 | Tramo ETAPA_6: ver **B1** (l. 160 L Cil −1,00 vs monocular −0,50); **B2** pendiente |
 
 ### 8.3 Resultado
 
@@ -412,4 +470,4 @@ Protocolo replicado: esférico fino R → 0; cilíndrico base 0; paso 1 «con el
 
 ---
 
-*Última actualización: 2026-07-03 — B3 implementado y QA OK (registro-14). B1 y B2 pendientes.*
+*Última actualización: 2026-07-03 — B3 implementado y QA OK (registro-14). **B1 redefinido:** Rx de entrada binocular (`construirRxBaseBinocular`). B2 pendiente.*

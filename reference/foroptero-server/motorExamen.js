@@ -881,6 +881,29 @@ function generarLetraSloan(letrasUsadas) {
 }
 
 /**
+ * Cilindro y ángulo por ojo: resultado monocular si existe, si no valoresRecalculados.
+ * Compartido por agudeza_alcanzada y línea base binocular (DEFINICIONES §2.1).
+ * @param {string} ojo - 'R' o 'L'
+ * @returns {{ cilindro: number, angulo: number }}
+ */
+function resolverCilindroYAnguloOjo(ojo) {
+  const resultados = estadoExamen.secuenciaExamen.resultados[ojo];
+  const valoresRecalculados = estadoExamen.valoresRecalculados[ojo];
+
+  const cilindro =
+    resultados.cilindrico !== null && resultados.cilindrico !== undefined
+      ? resultados.cilindrico
+      : valoresRecalculados.cilindro;
+
+  const angulo =
+    resultados.cilindricoAngulo !== null && resultados.cilindricoAngulo !== undefined
+      ? resultados.cilindricoAngulo
+      : valoresRecalculados.angulo;
+
+  return { cilindro, angulo };
+}
+
+/**
  * Calcula los valores finales del foróptero para agudeza_alcanzada
  * Combina valores recalculados con resultados de tests de lentes
  * @param {string} ojo - 'R' o 'L'
@@ -897,15 +920,7 @@ function calcularValoresFinalesForoptero(ojo) {
       ? resultados.esfericoGrueso
       : valoresRecalculados.esfera);
   
-  // Cilindro: Prioridad: cilindrico > valoresRecalculados
-  const cilindro = resultados.cilindrico !== null && resultados.cilindrico !== undefined
-    ? resultados.cilindrico
-    : valoresRecalculados.cilindro;
-  
-  // Ángulo: Prioridad: cilindricoAngulo > valoresRecalculados
-  const angulo = resultados.cilindricoAngulo !== null && resultados.cilindricoAngulo !== undefined
-    ? resultados.cilindricoAngulo
-    : valoresRecalculados.angulo;
+  const { cilindro, angulo } = resolverCilindroYAnguloOjo(ojo);
   
   console.log(`🔧 Valores finales foróptero para ${ojo}:`, { esfera, cilindro, angulo });
   
@@ -3605,20 +3620,8 @@ function construirRxBaseBinocular() {
     return { ok: false, error: 'Falta esférico fino confirmado para binocular (R y L)' };
   }
 
-  function cilYAnguloOjo(ojo) {
-    const res = resultados[ojo];
-    const tieneCil =
-      res.cilindrico !== null && res.cilindrico !== undefined;
-    const tieneAng =
-      res.cilindricoAngulo !== null && res.cilindricoAngulo !== undefined;
-    if (tieneCil && tieneAng) {
-      return { cilindro: res.cilindrico, angulo: res.cilindricoAngulo };
-    }
-    return { cilindro: recalc[ojo].cilindro, angulo: recalc[ojo].angulo };
-  }
-
-  const cR = cilYAnguloOjo('R');
-  const cL = cilYAnguloOjo('L');
+  const cR = resolverCilindroYAnguloOjo('R');
+  const cL = resolverCilindroYAnguloOjo('L');
   if (cR.cilindro == null || cR.angulo == null || cL.cilindro == null || cL.angulo == null) {
     return { ok: false, error: 'Faltan cilindro/eje (resultados o valores recalculados) para binocular' };
   }

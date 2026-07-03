@@ -970,7 +970,9 @@ Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` 
 
 **Contraste registro-13 vs 14:** misma secuencia de respuestas en cilíndrico OD; única divergencia en foróptero y resultado tras paso 2.
 
-**Smoke regresión:** cilíndrico OI bracket ±0,50 normal; examen completo FINALIZADO; Puntos 1–4 sin regresión observable.
+**Bug B1 (binocular, pendiente):** al abrir ambos ojos (l. 160), OI muestra `Cil −1,00` (recalc) en lugar de `Cil −0,50` (resultado monocular l. 186) porque `cilindricoAngulo` está `pendiente`. Ver `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §B1.
+
+**Verificación de no regresión:** cilíndrico OI bracket ±0,50 normal; examen completo FINALIZADO; Puntos 1–4 sin regresión observable en cilíndrico OD (B3).
 
 **Resultado:** ✅ **Fix B3 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §8.
 
@@ -1333,7 +1335,7 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
   - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5); evidencia pre-fix B3 cilíndrico OD
   - **`examen-registro-14.csv`** — QA fix B3 OK post-fix (§4.0.6)
-- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico (B1–B3); B3 cerrado
+- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B3 cerrado**; **B1** (Rx entrada binocular) y **B2** pendientes
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales

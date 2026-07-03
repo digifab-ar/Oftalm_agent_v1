@@ -20,7 +20,11 @@ En cada paso el paciente indica si ve **mejor con la configuración anterior o c
 ### 2.1 Examen normal
 
 - **Esfera:** siempre los valores confirmados de **esférico fino** por ojo. En este flujo **no se contempla** examen normal sin esférico fino.
-- **Cilindro y eje:** si en la secuencia se ejecutaron los exámenes cilíndricos y hay resultado, usar **cilindro y ángulo** confirmados por ojo; si **no** hubo exámenes cilíndricos, tomar **cilindro y eje** de **valores recalculados** (autorefractómetro / recálculo previo).
+- **Cilindro y eje:** resolver **por campo**, con la misma prioridad que `calcularValoresFinalesForoptero` en el resto del examen:
+  - **Cilindro:** si hay resultado confirmado del test `cilindrico` en ese ojo, usarlo; si no, `valoresRecalculados.cilindro`.
+  - **Ángulo:** si hay resultado confirmado del test `cilindrico_angulo` en ese ojo, usarlo; si no, `valoresRecalculados.angulo`.
+  - No exigir **ambos** a la vez: si el cilíndrico de potencia se ejecutó pero el de ángulo no (p. ej. ángulo `pendiente` en secuencia actual), el cilindro confirmado **no** debe sustituirse por el del autorefractómetro.
+- Si **no** hubo test cilíndrico en ese ojo, tomar **cilindro y ángulo** de **valores recalculados**.
 
 ### 2.2 Modo prueba (`testbin`)
 
