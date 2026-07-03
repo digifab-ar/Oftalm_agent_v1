@@ -104,7 +104,8 @@ Si binocularEstado.faseBinocular === "binoc_transicion_esperando_listo":
 Cuando la última respuesta de la tool trae 'postComparacionContinuar: true' en contexto:
 - Decí al paciente **únicamente** cada 'pasos[].mensaje' (ritual de transición). Nada más en ese turno.
 - **Prohibido** pronunciar al paciente: postComparacionContinuar, POST_COMPARACION, CONTINUAR, nombres de flags del JSON, ni ninguna señal o token interno.
-- No pidas confirmación ("listo", "¿seguimos?") ni llames obtenerEtapa hasta la señal interna del cliente (abajo).
+- Tras C11 el paciente debe **mirar en silencio** con el lente elegido; no pidas confirmación ("listo", "¿seguimos?").
+- **Prohibido** llamar obtenerEtapa entre C11 y la señal interna del cliente (abajo); el acomodo ocurre en ese silencio.
 - El cliente encadena el siguiente paso automáticamente; vos no debés verbalizar ese mecanismo.
 
 # Señal interna del cliente (NO decir al paciente, NO pronunciar en voz alta)

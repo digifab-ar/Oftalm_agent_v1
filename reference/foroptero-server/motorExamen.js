@@ -971,9 +971,9 @@ const MSG_AGUDEZA_LETRA_PANTALLA_VARIANTES = [
 ];
 
 const MSG_POST_COMPARACION_LENTES_VARIANTES = [
-  'Bueno, volvemos a tu selección.',
-  'Perfecto, seguimos con el lente que elegiste.',
-  'Bien, me quedo con la opción elegida y continuamos.'
+  'Quedate un momento con este lente, mirá con calma.',
+  'Conservá el lente que elegiste unos segundos, fijate bien.',
+  'Perfecto, mantené este lente un instante antes de seguir.'
 ];
 
 const MSG_COMPARACION_LENTES_VARIANTES = [
@@ -1833,7 +1833,8 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
   };
 }
 
-const POST_COMPARACION_ESPERA_SEG = 6;
+// Acomodo post-C11 (6 s): lo aplica el cliente (POST_COMPARACION_CLIENT_PAUSE_MS).
+// Ver PLAN_ACOMODO_POST_C11.md — ya no se espera aquí antes de devolver C11.
 
 function lensValorCerca(a, b) {
   if (a == null || b == null) return a === b;
@@ -1850,7 +1851,7 @@ function comparacionParametroEsNoOp(tipoTest, valorEnCara, valorSiguiente) {
 }
 
 /**
- * §4.4: pausa 3s + ritual post-comparación (C11) + deferred solo si aplica (p. ej. hubo reanclaje, anterior/igual con cambio; no en P1 actual+cambio ni P2 no-op).
+ * §4.4: ritual post-comparación (C11) + deferred; acomodo post-C11 en cliente (PLAN_ACOMODO_POST_C11).
  */
 function necesitaRitualSigamosPostComparacionLentes({
   pasosReanchorLen,
@@ -2067,9 +2068,6 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
             ritualEntre.valorParam
           );
           await ejecutarPasosAutomaticamente(pasosSolo);
-          await ejecutarPasosAutomaticamente([
-            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
-          ]);
           estadoExamen.deferredPostComparacion = { kind: 'ETAPA_5_RITUAL_INTER_TEST_COMPLETAR' };
           return {
             ok: true,
@@ -2161,10 +2159,6 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
         });
 
         if (necesitaRitualPost) {
-          await ejecutarPasosAutomaticamente([
-            { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
-          ]);
-
           estadoExamen.deferredPostComparacion = {
             kind: 'ETAPA_5_MOSTRAR_SIGUIENTE',
             pasosMostrar
@@ -2264,9 +2258,6 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
               { tipo: 'esperar_foroptero', orden: 2 }
             ];
             await ejecutarPasosAutomaticamente(pasosReanchor);
-            await ejecutarPasosAutomaticamente([
-              { tipo: 'esperar', esperarSegundos: POST_COMPARACION_ESPERA_SEG, orden: 1 }
-            ]);
             estadoExamen.deferredPostComparacion = { kind: 'ETAPA_6_GENERAR' };
             return {
               ok: true,

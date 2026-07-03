@@ -3,8 +3,8 @@ import type { RealtimeSession } from '@openai/agents/realtime';
 /** Señal interna (cliente → agente). No se muestra en transcript. */
 export const POST_COMPARACION_CONTINUAR_NUDGE = '__POST_COMPARACION_CONTINUAR__';
 
-/** Pacing TPM: pausa tras TTS de Sigamos y antes del nudge auto_chain (Fase 1b). */
-export const POST_COMPARACION_CLIENT_PAUSE_MS = 2000;
+/** Acomodo clínico post-C11: pausa tras TTS antes del nudge auto_chain (PLAN_ACOMODO_POST_C11). */
+export const POST_COMPARACION_CLIENT_PAUSE_MS = 6000;
 
 export function isPostComparacionContinuarNudge(text: string): boolean {
   return text.trim() === POST_COMPARACION_CONTINUAR_NUDGE;
@@ -25,7 +25,7 @@ function parseToolResult(result: unknown): Record<string, unknown> | null {
 }
 
 /**
- * Tras postComparacionContinuar el agente debe encadenar obtenerEtapa({}) al terminar TTS de Sigamos.
+ * Tras postComparacionContinuar el agente debe encadenar obtenerEtapa({}) al terminar TTS de C11.
  * Si el modelo no lo hace solo, el cliente envía una señal interna al detectar audio_stopped.
  */
 export function attachPostComparacionContinuarHandlers(
@@ -33,6 +33,7 @@ export function attachPostComparacionContinuarHandlers(
   logClientEvent: (obj: Record<string, unknown>, suffix?: string) => void,
 ): () => void {
   let pending = false;
+  let nudgeScheduled = false;
   let nudgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const clearNudgeTimeout = () => {
@@ -40,6 +41,7 @@ export function attachPostComparacionContinuarHandlers(
       clearTimeout(nudgeTimeoutId);
       nudgeTimeoutId = null;
     }
+    nudgeScheduled = false;
   };
 
   const onToolEnd = (_ctx: unknown, _agent: unknown, tool: { name?: string }, result: unknown) => {
@@ -57,8 +59,11 @@ export function attachPostComparacionContinuarHandlers(
     tool: { name?: string },
     _details?: unknown,
   ) => {
-    if (tool?.name === 'obtenerEtapa' && pending) {
+    if (tool?.name !== 'obtenerEtapa') return;
+    if (pending) {
       pending = false;
+    }
+    if (nudgeScheduled) {
       clearNudgeTimeout();
     }
   };
@@ -67,8 +72,10 @@ export function attachPostComparacionContinuarHandlers(
     if (!pending) return;
     pending = false;
     clearNudgeTimeout();
+    nudgeScheduled = true;
     nudgeTimeoutId = setTimeout(() => {
       nudgeTimeoutId = null;
+      nudgeScheduled = false;
       logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
       session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
     }, POST_COMPARACION_CLIENT_PAUSE_MS);
