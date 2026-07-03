@@ -1833,7 +1833,7 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
   };
 }
 
-// Acomodo post-C11 (6 s): lo aplica el cliente (POST_COMPARACION_CLIENT_PAUSE_MS).
+// Acomodo post-C11 (4 s): lo aplica el cliente (POST_COMPARACION_CLIENT_PAUSE_MS).
 // Ver PLAN_ACOMODO_POST_C11.md — ya no se espera aquí antes de devolver C11.
 
 function lensValorCerca(a, b) {

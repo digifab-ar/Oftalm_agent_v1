@@ -4,7 +4,7 @@ import type { RealtimeSession } from '@openai/agents/realtime';
 export const POST_COMPARACION_CONTINUAR_NUDGE = '__POST_COMPARACION_CONTINUAR__';
 
 /** Acomodo clínico post-C11: pausa tras TTS antes del nudge auto_chain (PLAN_ACOMODO_POST_C11). */
-export const POST_COMPARACION_CLIENT_PAUSE_MS = 6000;
+export const POST_COMPARACION_CLIENT_PAUSE_MS = 4000;
 
 export function isPostComparacionContinuarNudge(text: string): boolean {
   return text.trim() === POST_COMPARACION_CONTINUAR_NUDGE;
