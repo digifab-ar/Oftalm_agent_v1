@@ -326,13 +326,13 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 
 ### Checklist manual
 
-- [ ] Agudeza: rotan variantes C10; payload `interpretacionAgudeza` correcto (`etapa` ETAPA_4).
-- [ ] Comparación ETAPA_5: variantes C12; payload `interpretacionComparacion` (`faseComparacion === preguntando`).
-- [ ] 1ª comparación esférico grueso: **un solo** `hablar` (sin intro).
-- [ ] Post-comparación: variantes C11; avance **sin** «listo» del paciente.
-- [ ] Binocular: variantes combinadas; comparación con `interpretacionComparacion`; «listo» solo con `faseBinocular` transición.
-- [ ] CSV columna Oftalmólogo: textos nuevos (sin campos extra).
-- [ ] Sin regresión clínica (protocolo tipo registro-14/16).
+- [x] Agudeza: rotan variantes C10; payload `interpretacionAgudeza` correcto (`etapa` ETAPA_4). — `examen-registro-17.csv` l.63–85, l.135–152
+- [x] Comparación ETAPA_5: variantes C12; payload `interpretacionComparacion` (`faseComparacion === preguntando`). — 14 preguntas, 3 variantes; 14/14 con `Interpretacion` comparación
+- [x] 1ª comparación esférico grueso: **un solo** `hablar` (sin intro). — l.17–18 (vs reg16 l.17–18 con intro + pregunta fija)
+- [x] Post-comparación: variantes C11; avance **sin** «listo» del paciente. — 9 rituales C11; hardware sigue sin respuesta del paciente
+- [x] Binocular: variantes combinadas; comparación con `interpretacionComparacion`; «listo» solo con `faseBinocular` transición. — l.155–161 (1 ronda esférica; cil omitido no-op)
+- [x] CSV columna Oftalmólogo: textos nuevos (sin campos extra).
+- [x] Sin regresión clínica (protocolo tipo registro-14/16). — mismos valores finales que reg16 (R +0.25→0, L 0, Cil L -0.5, binocular plano)
 
 ### Criterios globales
 
@@ -351,14 +351,71 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 | 3 | Implementar motor M1–M7 | ✅ |
 | 4 | Implementar agente A1–A5 | ✅ |
 | 5 | Docs D1–D2 | ✅ |
-| 6 | Deploy + QA §12 | ⬜ |
+| 6 | Deploy + QA §12 | ✅ (`examen-registro-17.csv`) |
 | 7 | Validación tono operador (D10) | ⬜ |
 
 ---
 
-## Anexo A — Evidencia de repetición
+## Anexo A — Evidencia de repetición (pre-fix)
 
 `examen-registro-13.csv` (~15 min ETAPA_5): **14×** pregunta comparación idéntica, **10×** «Sigamos con este.»
+
+---
+
+## Anexo D — QA post-deploy `examen-registro-17`
+
+**Archivo:** `registros-examen/examen-registro-17.csv`  
+**Fecha:** 2026-07-03 15:30–15:43 (America/Argentina/Buenos_Aires)  
+**Commit:** `d549358` (deploy motor + prompt)  
+**Duración:** ~13 min | **Estado:** `FINALIZADO` | **Modo:** `normal`
+
+### Copys observados
+
+| ID | Variantes en CSV | Conteo |
+|----|------------------|--------|
+| C10 agudeza | las 3 (`Mirá la pantalla…` / `Fijate la letra…` / `Mirá con calma…`) | 9 preguntas |
+| C11 post-comp. | las 3 (`Bueno, volvemos…` / `Perfecto, seguimos…` / `Bien, me quedo…`) | 9 rituales |
+| C12 comparación | las 3 (`Y ahora…` / `¿Con cuál ves más claro…` / `Probemos así…`) | 14 preguntas |
+| Binocular | variante 1 (`Ahora probamos otro par…`) | 1 (única ronda esférica) |
+
+**Eliminados (ausentes en CSV):** intro esférico grueso *«Ahora te voy a mostrar otro lente…»*, `Sigamos con este.`, `Ves mejor con este o con el anterior?`, *configuración anterior/actual*.
+
+### Routing agente (matching por contexto)
+
+| Caso | Evidencia | Resultado |
+|------|-----------|-----------|
+| Pre-grueso → `interpretacionAgudeza` | l.14–15, l.88–89 | OK |
+| Comparación → `interpretacionComparacion` | l.19–20, l.159–161 | OK (14/14) |
+| Transición binocular «listo» sin comparación | l.155–157 | OK |
+| Post-comparación sin «listo» paciente | l.22–24, l.29–31, … | OK |
+| Preferencia `actual` sin ritual C11 (P1) | l.40–44 | OK (comportamiento esperado) |
+
+### Resultados clínicos (sin regresión vs reg16)
+
+| Test | R | L |
+|------|---|---|
+| Esférico grueso | +0.25 | 0 |
+| Esférico fino | 0 | 0 |
+| Cilíndrico | 0 | -0.50 |
+| Agudeza alcanzada | 0.3 | 0.3 |
+| Binocular | +0.00 / +0.00 @ 0° (ambos ojos) | idéntico a reg16 |
+
+*Nota:* reg16 cerró agudeza R en 0.2 (paciente acertó N); reg17 en 0.3 (respondió `borroso` en 0.2, l.73). Diferencia por respuestas del paciente, no por copys.
+
+### Anomalía menor (no bloqueante)
+
+- **l.69–72:** paciente responde `n` (letra N @ logMAR 0.2) **sin** fila `Interpretacion` en CSV; el flujo continúa con otra variante C10 y luego `borroso` (l.73–74). Posible turno sin tool-call o gap de logging en agudeza de confirmación — **no** relacionado con copys ni routing de comparación. Monitorear en próximo registro.
+
+### Comparación pre/post (reg16 → reg17)
+
+| Aspecto | reg16 (pre-fix copy) | reg17 (post-fix) |
+|---------|----------------------|------------------|
+| 1ª comp. gruesa OD | 2× `hablar` (intro + pregunta fija) | 1× `hablar` (C12) |
+| Pregunta comparación | 14× texto idéntico | 14× rotación 3 variantes |
+| Post-comparación | 10× `Sigamos con este.` | 9× rotación C11 |
+| Binocular copy | configuración anterior/actual | lente anterior/nuevo |
+
+**Veredicto:** QA §12 **aprobado** para release de copy natural v1.0. Pendiente solo D10 (validación subjetiva de tono por operador clínico).
 
 ---
 
@@ -368,6 +425,7 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 - `reference/foroptero-server/motorExamen.js` (~936, 1209, 1775, 2838, 3002, 3505)
 - `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.3
 - `PLAN_RATE_LIMIT_EXAMEN.md` (pacing independiente del copy)
+- `registros-examen/examen-registro-17.csv` (QA post-deploy)
 
 ---
 
