@@ -143,6 +143,9 @@ let estadoExamen = {
 
   /** Índice de secuencia para el que ya se emitió el bundle de adaptación + pre-grueso (cambio de ojo). */
   adaptacionPreGruesoEmitidaParaIndice: null,
+
+  /** true tras ETAPA_3 con ambos ojos posicionados a recalculados (OI ocluido). */
+  lentesPreajustadasBilateral: false,
   
   // Secuencia del examen
   secuenciaExamen: {
@@ -275,6 +278,7 @@ export function inicializarExamen(modo = 'normal') {
     esperaListoCambioOjo: null,
     preGruesoVisual: null,
     adaptacionPreGruesoEmitidaParaIndice: null,
+    lentesPreajustadasBilateral: false,
     /** Tras "Sigamos con este.", siguiente llamada sin respuesta ejecuta pasos automáticos pendientes */
     deferredPostComparacion: null,
     ritualInterTestsPendiente: null,
@@ -916,6 +920,9 @@ const MSG_PRE_GRUESO_OD =
   'Vamos a empezar con el ojo derecho, esperemos a que se termine de mover los lentes y luego decime si ves bien.';
 const MSG_PRE_GRUESO_OI =
   'Ahora vamos con el ojo izquierdo. Esperemos a que se terminen de ajustar los lentes y decime si ves bien.';
+/** Transición R→L con preajuste bilateral: movimiento solo de oclusión (§2.5.6, Punto 4). */
+const MSG_PRE_GRUESO_OI_SOLO_OCLUSION =
+  'Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien.';
 const MSG_REPREGUNTA_AJUSTE = '¿Ahora ves bien o necesitás un ajuste más?';
 const MSG_LOGMAR_MAX_PRE_GRUESO =
   'Ya estamos en la fila más grande disponible. Seguimos con esta y pasamos a la comparación de lentes.';
@@ -930,6 +937,21 @@ function necesitaAdaptacionTrasAgudezaOtroOjo(testActual) {
   const prev = estadoExamen.secuenciaExamen.testsActivos[idx - 1];
   if (!prev || prev.tipo !== 'agudeza_alcanzada') return false;
   return prev.ojo !== testActual.ojo;
+}
+
+function mensajePreGruesoOjoIzquierdo() {
+  return estadoExamen.lentesPreajustadasBilateral
+    ? MSG_PRE_GRUESO_OI_SOLO_OCLUSION
+    : MSG_PRE_GRUESO_OI;
+}
+
+/** Cambio de ojo tras agudeza con preajuste ETAPA_3: solo oclusión (sin recomando óptico de OI). */
+function esTransicionSoloOclusionCambioOjo(ojo, adaptNecesaria) {
+  return (
+    estadoExamen.lentesPreajustadasBilateral &&
+    adaptNecesaria &&
+    ojo === 'L'
+  );
 }
 
 /**
@@ -1452,12 +1474,13 @@ function generarPasosEtapa3() {
   const valoresR = estadoExamen.valoresRecalculados.R;
   const valoresL = estadoExamen.valoresRecalculados.L;
   
-  // Configuración inicial:
-  // - Ojo derecho (R): valores recalculados, oclusión: "open"
-  // - Ojo izquierdo (L): oclusión: "close"
+  // Configuración inicial (preajuste bilateral — Punto 4):
+  // - R: valores recalculados + open
+  // - L: valores recalculados + close (lentes montadas, ojo ocluido)
   
   // 4. Marcar que se generaron los pasos (para evitar regenerarlos)
   estadoExamen.subEtapa = 'FOROPTERO_CONFIGURADO';
+  estadoExamen.lentesPreajustadasBilateral = true;
   
   // 5. Establecer ojo actual según el primer test
   estadoExamen.ojoActual = estadoExamen.secuenciaExamen.testActual?.ojo || 'R';
@@ -1480,6 +1503,9 @@ function generarPasosEtapa3() {
           occlusion: 'open'
         },
         L: {
+          esfera: valoresL.esfera,
+          cilindro: valoresL.cilindro,
+          angulo: valoresL.angulo,
           occlusion: 'close'
         }
       }
@@ -2812,7 +2838,7 @@ function generarPasosEtapa5() {
       pg.faseDialogo === 'repregunta_ajuste'
         ? MSG_REPREGUNTA_AJUSTE
         : pg.faseDialogo === 'inicial_oi'
-          ? MSG_PRE_GRUESO_OI
+          ? mensajePreGruesoOjoIzquierdo()
           : MSG_PRE_GRUESO_OD;
     return {
       ok: true,
@@ -2842,6 +2868,7 @@ function generarPasosEtapa5() {
   if (debeEmitirBundleAdaptacion) {
     const vr = estadoExamen.valoresRecalculados[ojo];
     const otro = ojo === 'R' ? 'L' : 'R';
+    const soloOclusion = esTransicionSoloOclusionCambioOjo(ojo, adaptNecesaria);
     estadoExamen.adaptacionPreGruesoEmitidaParaIndice = idxActual;
     estadoExamen.preGruesoVisual = {
       activa: true,
@@ -2853,17 +2880,22 @@ function generarPasosEtapa5() {
       {
         tipo: 'foroptero',
         orden: 1,
-        foroptero: {
-          [ojo]: {
-            esfera: vr.esfera,
-            cilindro: vr.cilindro,
-            angulo: vr.angulo,
-            occlusion: 'open'
-          },
-          [otro]: {
-            occlusion: 'close'
-          }
-        }
+        foroptero: soloOclusion
+          ? {
+              R: { occlusion: 'close' },
+              L: { occlusion: 'open' }
+            }
+          : {
+              [ojo]: {
+                esfera: vr.esfera,
+                cilindro: vr.cilindro,
+                angulo: vr.angulo,
+                occlusion: 'open'
+              },
+              [otro]: {
+                occlusion: 'close'
+              }
+            }
       },
       { tipo: 'esperar_foroptero', orden: 2 },
       {
@@ -2875,7 +2907,7 @@ function generarPasosEtapa5() {
       {
         tipo: 'hablar',
         orden: 4,
-        mensaje: ojo === 'L' ? MSG_PRE_GRUESO_OI : MSG_PRE_GRUESO_OD
+        mensaje: ojo === 'L' ? mensajePreGruesoOjoIzquierdo() : MSG_PRE_GRUESO_OD
       }
     ];
     return {

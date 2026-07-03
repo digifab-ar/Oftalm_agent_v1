@@ -390,7 +390,7 @@ Comando mínimo (transición oclusión):
   R: occlusion close          ← sin recomandar esfera/cilindro/ángulo de R
   L: occlusion open           ← lentes ya en recalculados; sin recomando óptico
 → TV H @ logMAR 0.3
-→ MSG_PRE_GRUESO_OI (adaptado: ya no "esperemos que se ajusten los lentes")
+→ `MSG_PRE_GRUESO_OI_SOLO_OCLUSION`: *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."*
 ```
 
 El firmware **ya omite** ejes cuyo valor no cambió (`"ya está en X, omitiendo movimiento"`). Con preajuste, la transición R→L debería limitarse a **motores de oclusión** (DD/DI).
@@ -404,7 +404,7 @@ Archivo principal: `reference/foroptero-server/motorExamen.js`
 | A1 | Preajuste en `generarPasosEtapa3()` | Incluir `L: { esfera, cilindro, angulo, occlusion: 'close' }` en el primer comando |
 | A2 | Flag de estado | Añadir p. ej. `estadoExamen.lentesPreajustadasBilateral = true` tras ETAPA_3 |
 | A3 | Simplificar bundle R→L | En `debeEmitirBundleAdaptacion` (bloque ~2826): si `lentesPreajustadasBilateral`, emitir **solo oclusión** en R y L; no reenviar esfera/cilindro/ángulo de L desde `valoresRecalculados` |
-| A4 | Copy transición OI | Nueva variante de `MSG_PRE_GRUESO_OI` sin "esperemos que se terminen de ajustar los lentes" cuando el movimiento es solo oclusión |
+| A4 | Copy transición OI | **Cerrada:** constante `MSG_PRE_GRUESO_OI_SOLO_OCLUSION` — *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* Usar cuando el bundle R→L es solo oclusión (preajuste activo). Mantener `MSG_PRE_GRUESO_OI` actual como fallback sin preajuste. |
 | A5 | Agudeza alcanzada → OI | Verificar que `generarPasosEtapa4` al cerrar OD no dispare recomando completo de L al avanzar test |
 | A6 | Caso borde: refinamientos OD | Tras tests de R, R queda en valores **refinados** (≠ recalculados). OI sigue en recalculados hasta su propio grueso — **correcto**; la transición no debe resetear R ni L |
 | A7 | Reinicio / modos test | Propagar flag en `reiniciarExamen()` y modos `testesf` / `testcil` si aplica |
@@ -1072,7 +1072,7 @@ Cada entrega sigue el mismo ciclo:
 | [ ] Inicio: foróptero mueve R **y** L a recalculados (L ocluido) | |
 | [ ] Comparativas OD: solo se mueve R | |
 | [ ] Fin agudeza OD → inicio OI: transición **< 10 s**, sin recomando óptico grande de L | |
-| [ ] Copy OI: sin "esperemos que se ajusten los lentes" si movimiento es solo oclusión | |
+| [ ] Copy OI (solo oclusión): agente dice *"Ahora vamos con el ojo izquierdo. Tomate tu tiempo y decime si ves bien."* — no el `MSG_PRE_GRUESO_OI` con "esperemos que se ajusten los lentes" | |
 | [ ] Valores finales OD/OI correctos (Puntos 2–3 no regresan) | |
 | [ ] CSV: timestamp fin OD → primer foróptero OI vs registro-5 | |
 
