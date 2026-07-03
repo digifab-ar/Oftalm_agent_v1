@@ -2,7 +2,8 @@
 
 **Evidencia pre-fix:** `registros-examen/examen-registro-13.csv` (2026-07-03 10:15–10:29)  
 **Evidencia post-fix B3:** `registros-examen/examen-registro-14.csv` (2026-07-03 11:01–11:15)  
-**Estado:** **B3 implementado y QA OK** (commit `a7ca9ad`) — B1 y B2 pendientes  
+**Evidencia post-fix B1:** `registros-examen/examen-registro-15.csv` (2026-07-03 11:48–12:02)  
+**Estado:** **B1 y B3 implementados y QA OK** (`fe7d53f`, `a7ca9ad`) — **B2 pendiente**  
 **Archivos principales afectados:** `reference/foroptero-server/motorExamen.js`  
 **Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3, §2.6.7, §4.0.6
 
@@ -12,7 +13,7 @@
 
 | # | Bug | Severidad | Causa raíz (1 línea) |
 |---|-----|-----------|----------------------|
-| **B1** | Al entrar en binocular, la Rx del foróptero **no** coincide con los resultados monoculars | Alta clínica | `construirRxBaseBinocular` / `cilYAnguloOjo` exige cilindro **y** ángulo confirmados; si falta ángulo (`pendiente`), descarta el cilindro monocular y usa `valoresRecalculados` |
+| **B1** | Al entrar en binocular, la Rx del foróptero **no** coincide con los resultados monoculars | Alta clínica | `construirRxBaseBinocular` / `cilYAnguloOjo` exige cilindro **y** ángulo confirmados; si falta ángulo (`pendiente`), descarta el cilindro monocular y usa `valoresRecalculados` | ✅ **Cerrado** (`fe7d53f`, registro-15 §9) |
 | **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persiste resultados y avanza a `FINALIZADO` **sin** comando foróptero con la Rx elegida |
 | **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) | ✅ **Cerrado** (`a7ca9ad`, registro-14 §8) |
 
@@ -392,8 +393,8 @@ Exportar `registros-examen/examen-registro-14.csv` (o siguiente número) con exa
 |---|--------------|-----|
 | 1 | OD cilíndrico base 0: paso 2 «anterior» → Cil **0,0** en resultados y foróptero | B3 | ✅ registro-14 |
 | 2 | Binocular última ronda «anterior» → foróptero = resultado guardado al `FINALIZADO` | B2 |
-| 3 | Entrada binocular: `L Cil −0,50` (resultado monocular) sin saltar a recalc `−1,00` | B1 |
-| 4 | Agudeza OI y línea 160 binocular: **misma** Rx L | B1 |
+| 3 | Entrada binocular: `L Cil −0,50` (resultado monocular) sin saltar a recalc `−1,00` | B1 | ✅ registro-15 |
+| 4 | Agudeza OI y línea binocular: **misma** Rx L | B1 | ✅ registro-15 (l. 150 vs 155) |
 | 5 | Cilíndrico bilateral normal (base ≤ −0,50) sin regresión | B3 regresión |
 | 6 | `postComparacionContinuar` / Sigamos entre comparativas intra-test intacto | Regresión |
 
@@ -426,8 +427,9 @@ sequenceDiagram
 | Documento | Relación |
 |-----------|----------|
 | `registros-examen/examen-registro-13.csv` | Evidencia B1 (L Cil −1,00 al entrar binocular); B2 |
-| `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8); evidencia B1 (l. 160 vs 186) |
-| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6 | Cierre B3; cilíndrico ángulo pendiente en secuencia normal |
+| `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8); evidencia pre-fix B1 (l. 160 vs 186) |
+| `registros-examen/examen-registro-15.csv` | Evidencia post-fix B1 OK (§9) |
+| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6, §4.0.7 | Cierre B3 (§4.0.6) y B1 (§4.0.7) |
 | `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1 | Regla línea base; aclarar resolución independiente cil/ángulo (B1) |
 | `reference/foroptero-server/motorExamen.js` | ~3608–3618 (B1), ~889–908 (referencia correcta), ~2031–2038 (B3), ~3892 (B2) |
 
@@ -470,4 +472,40 @@ Protocolo replicado: esférico fino R → 0; cilíndrico base 0; paso 1 «con el
 
 ---
 
-*Última actualización: 2026-07-03 — B3 implementado y QA OK (registro-14). **B1 redefinido:** Rx de entrada binocular (`construirRxBaseBinocular`). B2 pendiente.*
+## 9. QA post-fix B1 — `examen-registro-15`
+
+**Archivo:** `registros-examen/examen-registro-15.csv`  
+**Sesión:** 2026-07-03, 11:48–12:02 (exportado 12:02)  
+**Commit probado:** `fe7d53f` (`fix(binocular): use monocular cylinder when angle is pending at ETAPA_6`)  
+**Valores iniciales / recalculados:** idénticos a registro-13 y 14 (mismo escenario de reproducción).
+
+### 9.1 Criterio B1 — Rx de entrada binocular = resultados monoculars
+
+Escenario: cilíndrico OI confirmado **−0,50**; cilíndrico ángulo OI **pendiente** (secuencia normal sin test de ángulo).
+
+| Timestamp | Línea | Evento | Registro-14 (pre-fix B1) | Registro-15 (post-fix) |
+|-----------|-------|--------|--------------------------|------------------------|
+| — | 179 / 186 | Resultado `Cilíndrico (L)` | **−0,50** | **−0,50** |
+| — | 150 / 140 | Última agudeza OI monocular | `L Cil −0.50 @20°` | `L Cil −0.50 @20°` |
+| 11:13:33 / 12:00:35 | 160 / **155** | Primera línea binocular (ambos ojos) | `L Cil **−1.00**` ❌ | `L Cil **−0.50**` ✅ |
+| 11:13:56 / 12:01:01 | 164 / **159** | Tras «listo» | `L Cil −1.00` ❌ | `L Cil −0.50` ✅ |
+| 12:01:15 / 12:01:15 | — / **164** | Variante cilíndrica binocular | Partía de −1,00 → −0,50 | Parte de **−0,50 → 0,00** ✅ |
+
+**Contraste directo:** misma secuencia monocular; al abrir ambos ojos el foróptero ya **no** sustituye el cilindro confirmado por el recalc (`−1,00`).
+
+### 9.2 Smoke regresión en el mismo examen
+
+| Test | Resultado | Notas |
+|------|-----------|-------|
+| Cilíndrico R | 0 | Sin regresión B3 (secuencial bajo OD) |
+| Cilíndrico L | −0.50 | Bracket ±0,50 normal |
+| Agudeza R / L | 0.2 / 0.3 | Examen completo FINALIZADO |
+| Binocular | L Cil 0,00 (2× «actual») | **B2** no ejercitado en esta sesión |
+
+### 9.3 Resultado
+
+✅ **B1 cerrado** — fix `fe7d53f` validado con CSV archivado.
+
+---
+
+*Última actualización: 2026-07-03 — B1 y B3 implementados y QA OK (registros-15 y 14). B2 pendiente.*

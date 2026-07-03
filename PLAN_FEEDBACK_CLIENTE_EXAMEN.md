@@ -29,6 +29,7 @@
    - [4.0.4 examen-registro-11 — QA Punto 3 OK](#404-examen-registro-11--qa-punto-3-ok-post-fix)
    - [4.0.5 examen-registro-13 — QA Punto 4 OK](#405-examen-registro-13--qa-punto-4-ok-post-fix)
    - [4.0.6 examen-registro-14 — QA fix B3 cilíndrico secuencial](#406-examen-registro-14--qa-fix-b3-cilíndrico-secuencial-post-fix)
+   - [4.0.7 examen-registro-15 — QA fix B1 Rx entrada binocular](#407-examen-registro-15--qa-fix-b1-rx-entrada-binocular-post-fix)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -970,11 +971,46 @@ Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` 
 
 **Contraste registro-13 vs 14:** misma secuencia de respuestas en cilíndrico OD; única divergencia en foróptero y resultado tras paso 2.
 
-**Bug B1 (binocular, pendiente):** al abrir ambos ojos (l. 160), OI muestra `Cil −1,00` (recalc) en lugar de `Cil −0,50` (resultado monocular l. 186) porque `cilindricoAngulo` está `pendiente`. Ver `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §B1.
+**Bug B1 (binocular, pre-fix en este registro):** al abrir ambos ojos (l. 160), OI muestra `Cil −1,00` (recalc) en lugar de `Cil −0,50` (resultado monocular l. 186) porque `cilindricoAngulo` está `pendiente`. Corregido en `fe7d53f`; evidencia post-fix en `examen-registro-15.csv` (§4.0.7).
 
 **Verificación de no regresión:** cilíndrico OI bracket ±0,50 normal; examen completo FINALIZADO; Puntos 1–4 sin regresión observable en cilíndrico OD (B3).
 
 **Resultado:** ✅ **Fix B3 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §8.
+
+---
+
+### 4.0.7 `examen-registro-15` — QA fix B1 Rx entrada binocular (post-fix)
+
+**Archivo:** `registros-examen/examen-registro-15.csv`  
+**Sesión:** 2026-07-03, 11:48–12:02 (exportado 12:02)  
+**Valores iniciales:** `<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20`  
+**Valores recalculados:** `<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20`  
+**Estado al exportar:** FINALIZADO  
+**Contexto:** reproducción del escenario registro-14 (cilíndrico OI −0,50, ángulo pendiente) tras commit `fe7d53f` (`resolverCilindroYAnguloOjo` en línea base binocular).
+
+**Criterio B1 — monocular → binocular sin salto de cilindro OI:**
+
+| Timestamp | Línea | Evento | Registro-14 (pre-fix) | Registro-15 (post-fix) |
+|-----------|-------|--------|----------------------|------------------------|
+| — | 186 / 179 | Resultado `Cilíndrico (L)` | −0,50 | −0,50 |
+| — | 155 / 150 | Última agudeza OI monocular | `L Cil −0.50` | `L Cil −0.50` |
+| 11:13:33 / 12:00:35 | 160 / **155** | Entrada binocular (ambos ojos) | `L Cil −1.00` ❌ | `L Cil −0.50` ✅ |
+| 11:13:56 / 12:01:01 | 164 / **159** | Tras «listo» | `L Cil −1.00` | `L Cil −0.50` ✅ |
+| 12:01:15 / 12:01:15 | 171 / **164** | Variante cilíndrica | −1,00 → −0,50 | −0,50 → 0,00 ✅ |
+
+**Resultado al cierre:**
+
+| Test | R (OD) | L (OI) |
+|------|--------|--------|
+| Esférico fino | 0 | 0 |
+| Cilíndrico | 0 | −0.50 |
+| Cilíndrico ángulo | pendiente | pendiente |
+| Agudeza alcanzada | 0.2 | 0.3 |
+| Binocular | Cil 0 @ 0° | Cil 0 @ 0° (2× «actual») |
+
+**Verificación de no regresión:** cilíndrico OD secuencial bajo → 0; examen completo FINALIZADO; B3 sin regresión en la misma sesión.
+
+**Resultado:** ✅ **Fix B1 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §9.
 
 ---
 
@@ -1335,7 +1371,8 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
   - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5); evidencia pre-fix B3 cilíndrico OD
   - **`examen-registro-14.csv`** — QA fix B3 OK post-fix (§4.0.6)
-- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B3 cerrado**; **B1** (Rx entrada binocular) y **B2** pendientes
+  - **`examen-registro-15.csv`** — QA fix B1 OK post-fix (§4.0.7)
+- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B1** y **B3 cerrados**; **B2** pendiente
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales
