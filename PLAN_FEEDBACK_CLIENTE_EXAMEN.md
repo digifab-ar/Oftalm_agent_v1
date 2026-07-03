@@ -30,6 +30,7 @@
    - [4.0.5 examen-registro-13 — QA Punto 4 OK](#405-examen-registro-13--qa-punto-4-ok-post-fix)
    - [4.0.6 examen-registro-14 — QA fix B3 cilíndrico secuencial](#406-examen-registro-14--qa-fix-b3-cilíndrico-secuencial-post-fix)
    - [4.0.7 examen-registro-15 — QA fix B1 Rx entrada binocular](#407-examen-registro-15--qa-fix-b1-rx-entrada-binocular-post-fix)
+   - [4.0.8 examen-registro-16 — QA fix B4 omitir pasos no-op binocular](#408-examen-registro-16--qa-fix-b4-omitir-pasos-no-op-binocular-post-fix)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -1010,7 +1011,41 @@ Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` 
 
 **Verificación de no regresión:** cilíndrico OD secuencial bajo → 0; examen completo FINALIZADO; B3 sin regresión en la misma sesión.
 
-**Resultado:** ✅ **Fix B1 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §9.
+**Resultado:** ✅ **Fix B1 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §9.  
+**Nota B4 (pre-fix en este registro):** l. 161–163 — ronda esférica binocular sin contraste; corregido en `26a8d40`; evidencia post-fix en `examen-registro-16.csv` (§4.0.8).
+
+---
+
+### 4.0.8 `examen-registro-16` — QA fix B4 omitir pasos no-op binocular (post-fix)
+
+**Archivo:** `registros-examen/examen-registro-16.csv`  
+**Sesión:** 2026-07-03, 12:54–13:07 (exportado 13:07)  
+**Valores iniciales / recalculados:** idénticos a registro-15 (esf 0/0, L cil −0,50)  
+**Estado al exportar:** FINALIZADO  
+**Contexto:** reproducción del escenario registro-15 tras commit `26a8d40` (`varianteBinocularEsNoOp`, `prepararBinocularPostEsfera`).
+
+**Criterio B4 — tras «listo», sin ronda esférica vacía:**
+
+| Timestamp | Línea | Evento | Registro-15 (pre-fix B4) | Registro-16 (post-fix) |
+|-----------|-------|--------|--------------------------|------------------------|
+| 12:00:35 / 13:06:54 | 155 | Entrada binocular | `L Cil −0.50` | `L Cil −0.50` ✓ |
+| 12:01:01 / 13:07:00 | 158 | Paciente «listo» | idem | idem |
+| 12:01:02 / — | 161–163 | 1.ª comparativa ETAPA_6 | Esfera sin cambio ❌ | **omitida** ✅ |
+| 12:01:15 / 13:07:00 | 164 / **159** | 1.er cambio post-listo | `L Cil 0.00` | `L Cil 0.00` ✅ |
+| 12:01:21 / 13:07:05 | 166–168 / **161–163** | Rondas comparativas | **2** | **1** ✅ |
+
+**Resultado al cierre:**
+
+| Test | R (OD) | L (OI) |
+|------|--------|--------|
+| Esférico fino | 0 | 0 |
+| Cilíndrico | 0 | −0.50 |
+| Agudeza alcanzada | 0.2 | 0.3 |
+| Binocular | Cil 0 @ 0° | Cil 0 @ 0° (1× «actual») |
+
+**Verificación de no regresión:** B1 (L Cil −0,50 al entrar binocular); B3 (cilíndrico OD → 0); examen FINALIZADO.
+
+**Resultado:** ✅ **Fix B4 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §10.
 
 ---
 
@@ -1371,8 +1406,9 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
   - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5); evidencia pre-fix B3 cilíndrico OD
   - **`examen-registro-14.csv`** — QA fix B3 OK post-fix (§4.0.6)
-  - **`examen-registro-15.csv`** — QA fix B1 OK post-fix (§4.0.7)
-- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B1** y **B3 cerrados**; **B2** pendiente
+  - **`examen-registro-15.csv`** — QA fix B1 OK post-fix (§4.0.7); evidencia pre-fix B4 (l. 161–163)
+  - **`examen-registro-16.csv`** — QA fix B4 OK post-fix (§4.0.8)
+- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B1**, **B3** y **B4** cerrados; **B2** pendiente
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales

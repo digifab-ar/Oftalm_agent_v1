@@ -4,7 +4,8 @@
 **Evidencia post-fix B3:** `registros-examen/examen-registro-14.csv` (2026-07-03 11:01–11:15)  
 **Evidencia post-fix B1:** `registros-examen/examen-registro-15.csv` (2026-07-03 11:48–12:02)  
 **Evidencia pre-fix B4:** `registros-examen/examen-registro-15.csv` (l. 161–163 — ronda esférica no-op)  
-**Estado:** **B1 y B3 implementados y QA OK** (`fe7d53f`, `a7ca9ad`) — **B2 y B4 pendientes**  
+**Evidencia post-fix B4:** `registros-examen/examen-registro-16.csv` (2026-07-03 12:54–13:07)  
+**Estado:** **B1, B3 y B4 implementados y QA OK** (`fe7d53f`, `a7ca9ad`, `26a8d40`) — **B2 pendiente**  
 **Archivos principales afectados:** `reference/foroptero-server/motorExamen.js`  
 **Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3, §2.6.7, §4.0.6
 
@@ -17,7 +18,7 @@
 | **B1** | Al entrar en binocular, la Rx del foróptero **no** coincide con los resultados monoculars | Alta clínica | `construirRxBaseBinocular` / `cilYAnguloOjo` exige cilindro **y** ángulo confirmados; si falta ángulo (`pendiente`), descarta el cilindro monocular y usa `valoresRecalculados` | ✅ **Cerrado** (`fe7d53f`, registro-15 §9) |
 | **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persiste resultados y avanza a `FINALIZADO` **sin** comando foróptero con la Rx elegida |
 | **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) | ✅ **Cerrado** (`a7ca9ad`, registro-14 §8) |
-| **B4** | Ronda binocular esférica o cilíndrica **sin contraste** (variante = base) igual se pregunta al paciente | Media UX / protocolo | Tras «listo», el motor siempre entra en `FB_ESF_MOSTRAR` aunque `aplicarVarianteEsferica` no cambie ningún ojo; §7 cilíndrico solo omite **después** de cerrar esfera | Pendiente |
+| **B4** | Ronda binocular esférica o cilíndrica **sin contraste** (variante = base) igual se pregunta al paciente | Media UX / protocolo | Tras «listo», el motor siempre entra en `FB_ESF_MOSTRAR` aunque `aplicarVarianteEsferica` no cambie ningún ojo; §7 cilíndrico solo omite **después** de cerrar esfera | ✅ **Cerrado** (`26a8d40`, registro-16 §10) |
 
 **Registro-13 (pre-fix):** `Cilíndrico (R) = −0,25` (línea 176) — paciente eligió 0,0 en paso 2 pero el motor confirmó −0,25.  
 **Registro-14 (post-fix):** `Cilíndrico (R) = 0` (línea 180) — mismo protocolo, resultado correcto.  
@@ -441,11 +442,14 @@ Reproducir escenario registro-14 (cilíndrico OI −0,50, ángulo pendiente):
 
 ---
 
-### Fase 4 — B4: omitir pasos binocular sin contraste (solo ETAPA_6)
+### Fase 4 — B4: omitir pasos binocular sin contraste (solo ETAPA_6) ✅ CERRADO
+
+**Archivo:** `reference/foroptero-server/motorExamen.js`  
+**Commit:** `26a8d40` — `fix(binocular): skip no-op ETAPA_6 comparison steps (B4).`
 
 **Alcance:** únicamente `reference/foroptero-server/motorExamen.js` (funciones ETAPA_6) y `DEFINICIONES_EXAMEN_BINOCULAR.md`. **Sin** cambios en agente, firmware, ETAPA_1–5, ni helpers monocular compartidos salvo lectura.
 
-**Decisión de producto (D-B4) — a cerrar en implementación:**
+**Decisión de producto (D-B4) — cerrada:**
 
 | Tema | Decisión |
 |------|----------|
@@ -613,8 +617,8 @@ Exportar `registros-examen/examen-registro-14.csv` (o siguiente número) con exa
 | 4 | Agudeza OI y línea binocular: **misma** Rx L | B1 | ✅ registro-15 (l. 150 vs 155) |
 | 5 | Cilíndrico bilateral normal (base ≤ −0,50) sin regresión | B3 regresión |
 | 6 | `postComparacionContinuar` / Sigamos entre comparativas intra-test intacto | Regresión |
-| 7 | Esf 0/0: tras «listo», **sin** ronda esférica; 1.ª pregunta tras cambio cil | B4 |
-| 8 | Esf 0/0, Cil 0/0: tras «listo», **sin** comparativas | B4 |
+| 7 | Esf 0/0: tras «listo», **sin** ronda esférica; 1.ª pregunta tras cambio cil | B4 | ✅ registro-16 |
+| 8 | Esf 0/0, Cil 0/0: tras «listo», **sin** comparativas | B4 | — (registro-16 no ejercita; escenario §4.6 #3) |
 | 9 | R esf ≠ 0: ronda esférica binocular sigue activa | B4 regresión |
 
 ---
@@ -648,7 +652,8 @@ sequenceDiagram
 | `registros-examen/examen-registro-13.csv` | Evidencia B1 (L Cil −1,00 al entrar binocular); B2 |
 | `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8); evidencia pre-fix B1 (l. 160 vs 186) |
 | `registros-examen/examen-registro-15.csv` | Evidencia post-fix B1 OK (§9); evidencia pre-fix **B4** (l. 161–163) |
-| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6, §4.0.7 | Cierre B3 (§4.0.6) y B1 (§4.0.7) |
+| `registros-examen/examen-registro-16.csv` | Evidencia post-fix B4 OK (§10) |
+| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §4.0.7, §4.0.8 | Cierre B1 y B4 |
 | `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1, §7 (B4) | Regla línea base (B1); omisión pasos no-op (B4) |
 | `reference/foroptero-server/motorExamen.js` | ~889–908 (B1), ~2031–2038 (B3), ~3832–3890 (B2/B4), ~3636–3651 (variantes) |
 
@@ -727,4 +732,41 @@ Escenario: cilíndrico OI confirmado **−0,50**; cilíndrico ángulo OI **pendi
 
 ---
 
-*Última actualización: 2026-07-03 — B1 y B3 cerrados (registros 15 y 14). **B2** y **B4** (omitir pasos binocular no-op, solo ETAPA_6) pendientes.*
+## 10. QA post-fix B4 — `examen-registro-16`
+
+**Archivo:** `registros-examen/examen-registro-16.csv`  
+**Sesión:** 2026-07-03, 12:54–13:07 (exportado 13:07)  
+**Commit probado:** `26a8d40`  
+**Valores iniciales / recalculados:** idénticos a registro-15 (reproducción esf 0/0, L cil −0,50).
+
+### 10.1 Criterio B4 — omitir ronda esférica no-op; una sola comparativa cilíndrica
+
+| Timestamp | Línea | Evento | Registro-15 (pre-fix B4) | Registro-16 (post-fix) |
+|-----------|-------|--------|--------------------------|------------------------|
+| — | 155 | Entrada binocular | `L Cil −0.50` | `L Cil −0.50` ✓ |
+| 12:01:01 / 13:07:00 | 158 | Paciente «listo» | idem | idem |
+| 12:01:01 / — | 159 | Tras «listo» (re-anclaje base) | `L Cil −0.50` | *(omitido — salto directo a variante)* |
+| 12:01:02 / — | 161–163 | 1.ª pregunta comparativa | **Esfera sin cambio** ❌ | — **omitida** ✅ |
+| 12:01:15 / **13:07:00** | 164 / **159** | 1.er cambio foróptero post-listo | `L Cil 0.00` | `L Cil 0.00` ✅ |
+| 12:01:21 / **13:07:05** | 166–168 / **161–163** | Comparativas ETAPA_6 | **2** rondas | **1** ronda ✅ |
+| — | 177 | Resultado binocular L | Cil 0,00 | Cil 0,00 ✅ |
+
+**Contraste directo:** misma secuencia monocular; tras «listo» ya no hay pregunta esférica vacía — la primera (y única) comparativa coincide con el cambio cilíndrico `−0,50 → 0,00`.
+
+### 10.2 Smoke regresión en el mismo examen
+
+| Test | Resultado | Notas |
+|------|-----------|-------|
+| B1 entrada binocular | L Cil −0,50 l. 155 | Sin regresión |
+| B3 cilíndrico R | 0 | Sin regresión |
+| Cilíndrico L | −0,50 | Bracket normal |
+| Agudeza R / L | 0.2 / 0.3 | FINALIZADO |
+| Binocular | 1× «actual» → L Cil 0 | **B2** no ejercitado |
+
+### 10.3 Resultado
+
+✅ **B4 cerrado** — fix `26a8d40` validado con CSV archivado.
+
+---
+
+*Última actualización: 2026-07-03 — B1, B3 y B4 cerrados (registros 16, 15 y 14). **B2** pendiente.*
