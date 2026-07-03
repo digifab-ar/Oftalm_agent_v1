@@ -174,6 +174,11 @@ Configuración del agente AI conversacional.
 - Validación de formato y rangos
 - Guarda valores en `estadoExamen.valoresIniciales`
 
+**Contrato agente (ETAPA_1):**
+- Cuando el paciente envía un string con `<R>` y `<L>`, el agente llama **solo** `obtenerEtapa({ respuestaPaciente })` en ese turno — **sin** texto hablado (tool-first, igual que ETAPA_4).
+- **Prohibido** improvisar: *«voy a procesar»*, *«un momento»*, *«¿confirmamos listos?»*.
+- Tras validación, el backend ejecuta ETAPA_2 (silenciosa) + ETAPA_3 (foróptero) de forma síncrona (~10–23 s); el primer `hablar` llega al terminar (pre-grueso o agudeza). Ver `PLAN_COPY_NATURAL_AGENTE.md` Anexo E para mejoras P1 opcionales.
+
 #### **ETAPA_2: Recálculo Cilíndrico y Esférico**
 **Estado:** ✅ Implementado (silencioso)
 
@@ -402,6 +407,12 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
 - Pregunta combinada: 3 variantes (`mensajeBinocPreguntaCombinada()`), vocabulario «lente anterior / nuevo».
 - El agente envía `interpretacionComparacion` cuando `faseBinocular` es `binoc_esfera_preguntando` o `binoc_cil_preguntando`.
 
+**Regla de contrato (ritual post-comparación):**
+- Tras elegir lente, el backend puede devolver C11 (`mensajePostComparacionLentes()`) con `postComparacionContinuar: true` y `requiereRespuestaPaciente: false`.
+- El agente pronuncia **solo** `pasos[].mensaje` (C11); **no** verbaliza flags ni tokens internos (`POST_COMPARACION`, etc.).
+- El cliente (`postComparacionContinuar.ts`) encadena `obtenerEtapa({})` tras TTS vía señal interna `__POST_COMPARACION_CONTINUAR__`.
+- Detalle y QA: `PLAN_COPY_NATURAL_AGENTE.md` (Anexos D y E), `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.3.8.
+
 ### Tipos de Pasos
 
 - **`foroptero`** - Comando de foróptero (ejecutado automáticamente)
@@ -418,15 +429,21 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
 
 1. **Conversación Natural:**
    - Habla con el paciente de forma clara y profesional
-   - Usa mensajes exactos que el backend proporciona
-   - No menciona procesos técnicos
+   - Usa mensajes exactos que el backend proporciona (`pasos[].mensaje`)
+   - No menciona procesos técnicos ni flags internos del JSON
 
-2. **Interpretación de Respuestas:**
+2. **Routing por contexto (`obtenerEtapa`):**
+   - ETAPA_1 o string `<R>`/`<L>` → solo `respuestaPaciente` (tool-first, sin hablar en ese turno)
+   - ETAPA_4 / pre-grueso → `respuestaPaciente` + `interpretacionAgudeza` (tool-first)
+   - Comparación ETAPA_5/6 → `interpretacionComparacion` cuando `faseComparacion` o `faseBinocular` en preguntando
+   - Ritual post-comparación → solo C11; encadenado vía cliente, no por nombre de flag
+
+3. **Interpretación de Respuestas:**
    - En test de agudeza: interpreta si la letra es correcta, incorrecta, no ve, borroso, o no está seguro
    - En test de comparación de lentes: interpreta preferencia (anterior, actual, igual)
    - Envía interpretación estructurada al backend
 
-3. **NO Ejecuta Comandos:**
+4. **NO Ejecuta Comandos:**
    - El backend ejecuta automáticamente todos los comandos de dispositivos
    - El agente solo ejecuta pasos de tipo "hablar"
 
@@ -701,8 +718,10 @@ curl https://foroptero-production.up.railway.app/api/pantalla
 - **Feature (2026-03-13):** Panel `reference_framer/ForopteroControl.tsx` — botones de reinicio normal y modos de prueba; muestra `modo` desde detalle del examen.
 - **Bug Fix (2026-03-24):** `agudeza_alcanzada` ahora usa la misma lógica de confirmación y cierre que `agudeza_inicial` (2 confirmaciones cierran resultado en cualquier logMAR). Se mantiene como única diferencia que inicia en `resultados[ojo].agudezaInicial`.
 - **Feature (2026-04-22):** **ETAPA_6 (binocular)** — transición con mensaje *ambos ojos + listo*; comparaciones esférica y, si aplica, cilíndrica con variante ya aplicada antes del `hablar` (mensaje combinado: aviso de otro par + pregunta *anterior/actual*). Ajuste del agente para `interpretacionComparacion` solo en la pregunta comparativa, no en “listo”. Especificación en `reference/foroptero-server/DEFINICIONES_EXAMEN_BINOCULAR.md`.
+- **Feature (2026-07-03):** **Copy natural v1.0** — variantes rotativas C10–C12/C11/binocular en `motorExamen.js`; matching por contexto en `chatSupervisor/index.ts` (sin frases literales). Plan: `PLAN_COPY_NATURAL_AGENTE.md`; QA: `examen-registro-17.csv` (`d549358`).
+- **Bug Fix (2026-07-03):** **Orquestación agente post-copy** — tool-first ETAPA_1; prohibición de verbalizar `POST_COMPARACION_CONTINUAR`/flags en ritual C11 (`b08e35c`). QA operador OK. Detalle: `PLAN_COPY_NATURAL_AGENTE.md` Anexo E.
 
 ---
 
-**Última actualización:** 2026-05-12  
-**Estado:** Examen sin `agudeza_inicial` en secuencia normal; baseline logMAR 0,3 y binocular TV 0,3; modos de prueba `testesf` / `testcil` / `testbin` vía API.
+**Última actualización:** 2026-07-03  
+**Estado:** Copy natural v1.0 + fixes P0 orquestación desplegados; examen sin `agudeza_inicial` en secuencia normal; baseline logMAR 0,3 y binocular TV 0,3; modos de prueba `testesf` / `testcil` / `testbin` vía API.

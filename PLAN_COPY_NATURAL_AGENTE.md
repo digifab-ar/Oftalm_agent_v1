@@ -210,22 +210,24 @@ Usar el `contexto` de la **última** respuesta de `obtenerEtapa` **antes** de qu
 
 | Prioridad | Condición | Payload al responder |
 |-----------|-----------|----------------------|
-| 1 | `postComparacionContinuar === true` | No llamar `obtenerEtapa` hasta nudge `__POST_COMPARACION_CONTINUAR__`; luego `{}` |
+| 1 | `postComparacionContinuar === true` | Pronunciar solo `pasos[].mensaje` del ritual; no llamar `obtenerEtapa` hasta señal interna del cliente; luego `{}` |
 | 2 | `etapa === "ETAPA_4"` | `respuestaPaciente` + `interpretacionAgudeza` |
 | 3 | `etapa === "ETAPA_5"` && `ajusteLogmarPreGrueso === true` | `respuestaPaciente` + `interpretacionAgudeza` |
 | 4 | `etapa === "ETAPA_5"` && `comparacionEstado?.faseComparacion === "preguntando"` | `respuestaPaciente` + `interpretacionComparacion` |
 | 5 | `etapa === "ETAPA_6"` && `binocularEstado?.faseBinocular === "binoc_transicion_esperando_listo"` | solo `respuestaPaciente` |
 | 6 | `etapa === "ETAPA_6"` && `faseBinocular` ∈ `binoc_esfera_preguntando`, `binoc_cil_preguntando` | `respuestaPaciente` + `interpretacionComparacion` |
-| 7 | `etapa === "ETAPA_1"` | solo `respuestaPaciente` |
-| 8 | Inicio / duda | `{}` |
+| 7 | `etapa === "ETAPA_1"` **o** paciente envió string con `<R>` y `<L>` | solo `respuestaPaciente` (texto literal) |
+| 8 | Inicio / duda (mensaje **no** es autorefractómetro) | `{}` |
 
 **Notas de implementación en prompt:**
 
-- Eliminar referencias a: *«¿Ves mejor con este o con el anterior?»*, *«configuración anterior»*, *«Sigamos»* como disparadores de payload.
+- Eliminar referencias a frases literales como disparadores de payload.
 - Mantener regla verbatim: solo `pasos[].mensaje`.
-- Mantener tool-first ETAPA_4 / pre-grueso.
-- Tras C11: ignorar «listo»/«bien» del paciente si `postComparacionContinuar` (referir por flag, no por palabra «Sigamos»).
+- **Tool-first** en ETAPA_1, ETAPA_4 y pre-grueso: cero texto al paciente en el turno de su respuesta.
+- Ritual post-comparación: **prohibido** pronunciar `postComparacionContinuar`, `POST_COMPARACION` ni tokens internos; solo C11.
+- Tras C11: ignorar «listo»/«bien» del paciente si `postComparacionContinuar` (referir por flag).
 - Binocular transición: regla 5 cubre también `MSG_BINOC_REINTENTO_LISTO` (misma `faseBinocular`).
+- Token `__POST_COMPARACION_CONTINUAR__` solo en instrucciones del agente (no en `description` de la tool).
 
 ### Verificación backend (misma PR)
 
@@ -277,6 +279,8 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 | A3 | Ejemplo línea 13 | Quitar ejemplo con frase única; reforzar verbatim genérico |
 | A4 | Post-comparación | Referir `postComparacionContinuar`, no «Sigamos» |
 | A5 | Tool description | Alinear descripción de `obtenerEtapa` con matching por contexto |
+| A6 | Tool-first ETAPA_1 | Bloque P0: valores autorefractor → solo `respuestaPaciente`, sin filler |
+| A7 | Anti-verbalización ritual | Prohibir pronunciar flags/tokens; C11 solo desde `pasos[].mensaje` |
 
 ### 9.3 Documentación
 
@@ -353,6 +357,7 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 | 5 | Docs D1–D2 | ✅ |
 | 6 | Deploy + QA §12 | ✅ (`examen-registro-17.csv`) |
 | 7 | Validación tono operador (D10) | ⬜ |
+| 8 | Fixes P0 orquestación (ETAPA_1 + post-comp.) | ✅ (`b08e35c`, QA operador 2026-07-03) |
 
 ---
 
@@ -417,6 +422,42 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 
 **Veredicto:** QA §12 **aprobado** para release de copy natural v1.0. Pendiente solo D10 (validación subjetiva de tono por operador clínico).
 
+**Seguimiento post-QA (mismo día):** en pruebas adicionales se detectaron dos regresiones de orquestación (no de copy): loop intermitente en ETAPA_1 y verbalización de `POST_COMPARACION_CONTINUAR`. Corregidas en `b08e35c` — ver Anexo E.
+
+---
+
+## Anexo E — Fixes P0 orquestación (`b08e35c`)
+
+**Commit:** `b08e35c` — `fix(agent): P0 prompt fixes for ETAPA_1 and post-comparación verbalization`  
+**Archivo:** `src/app/agentConfigs/chatSupervisor/index.ts`  
+**QA:** operador — múltiples reinicios de examen; **OK** tras deploy frontend (2026-07-03 tarde)
+
+### Bug E1 — ETAPA_1 loop intermitente
+
+| Aspecto | Detalle |
+|---------|---------|
+| **Síntoma** | Tras enviar valores `<R>…/<L>…`, el agente a veces improvisaba (*«voy a procesar»*, *«¿confirmamos listos?»*) sin llamar `obtenerEtapa`; el paciente repetía valores |
+| **Causa** | Sin tool-first ETAPA_1; fila 8 `{}` competía con fila 7; ~10–23 s sin `pasos[].mensaje` tras validación (ETAPA_2/3 síncronas) invitaba filler |
+| **Fix P0** | Bloque tool-first ETAPA_1; fila 7 ampliada a string `<R>`+`<L>`; frases prohibidas explícitas |
+| **Estado** | ✅ Cerrado — primera prueba post-fix sin loop |
+
+### Bug E2 — Verbalización `POST_COMPARACION_CONTINUAR`
+
+| Aspecto | Detalle |
+|---------|---------|
+| **Síntoma** | Tras comparación de lentes, el agente **pronunciaba** `POST_COMPARACION_CONTINUAR` en voz alta (además o en lugar de C11) |
+| **Causa** | Prompt y `description` de la tool exponían el token/señal; el modelo verbalizaba el flag del JSON |
+| **Fix P0** | Sección REGLA POST-COMPARACIÓN; prohibición explícita de flags; token sacado de tool `description`; fila 1 sin string mágico |
+| **Estado** | ✅ Cerrado — ritual C11 + `auto_chain` sin jerga técnica audible |
+
+### Pendiente fuera P0 (no bloqueante)
+
+| ID | Fix | Motivo |
+|----|-----|--------|
+| P1-F4 | Ack backend inmediato tras ETAPA_1 + deferred ETAPA_2/3 | Cubrir latencia ~10–23 s sin depender del LLM |
+| P1-F6 | `pending` solo tras `audio_started` de C11 | Carrera `audio_stopped` en `postComparacionContinuar.ts` |
+| P1-F8 | Modo B: cliente llama `obtenerEtapa({})` sin LLM | Robustez total del encadenado post-ritual |
+
 ---
 
 ## Anexo B — Referencias
@@ -425,7 +466,8 @@ Confirmar que **toda** respuesta con pregunta comparativa incluye:
 - `reference/foroptero-server/motorExamen.js` (~936, 1209, 1775, 2838, 3002, 3505)
 - `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.3
 - `PLAN_RATE_LIMIT_EXAMEN.md` (pacing independiente del copy)
-- `registros-examen/examen-registro-17.csv` (QA post-deploy)
+- `registros-examen/examen-registro-17.csv` (QA post-deploy copy v1.0)
+- `b08e35c` — fixes P0 orquestación (Anexo E)
 
 ---
 

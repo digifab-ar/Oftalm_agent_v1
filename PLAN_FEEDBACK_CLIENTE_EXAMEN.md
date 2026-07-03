@@ -31,6 +31,7 @@
    - [4.0.6 examen-registro-14 — QA fix B3 cilíndrico secuencial](#406-examen-registro-14--qa-fix-b3-cilíndrico-secuencial-post-fix)
    - [4.0.7 examen-registro-15 — QA fix B1 Rx entrada binocular](#407-examen-registro-15--qa-fix-b1-rx-entrada-binocular-post-fix)
    - [4.0.8 examen-registro-16 — QA fix B4 omitir pasos no-op binocular](#408-examen-registro-16--qa-fix-b4-omitir-pasos-no-op-binocular-post-fix)
+   - [4.0.9 Copy natural v1.0 + fixes P0 orquestación](#409-copy-natural-v10--fixes-p0-orquestación-post-reg17)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -1049,6 +1050,42 @@ Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` 
 
 ---
 
+### 4.0.9 Copy natural v1.0 + fixes P0 orquestación (post-reg17)
+
+**Plan:** `PLAN_COPY_NATURAL_AGENTE.md` (Anexos D y E)  
+**Commits:** `d549358` (copy + routing por contexto), `b08e35c` (fixes P0 orquestación)  
+**Evidencia CSV:** `registros-examen/examen-registro-17.csv` (copy v1.0, 2026-07-03 15:30–15:43)  
+**QA operador adicional:** 2026-07-03 tarde — múltiples reinicios; **OK** tras `b08e35c`
+
+#### Entrega copy natural (`d549358`)
+
+| Ítem | Resultado |
+|------|-----------|
+| Variantes C10/C11/C12 + binocular | ✅ 3 variantes rotativas en CSV |
+| 1ª comparación gruesa sin intro | ✅ 1× `hablar` (vs reg16: 2×) |
+| Routing por `faseComparacion` / `faseBinocular` | ✅ 14/14 comparaciones con `interpretacionComparacion` |
+| Sin regresión clínica vs reg16 | ✅ |
+
+#### Regresiones detectadas en QA extendido (mismo día, pre-`b08e35c`)
+
+| ID | Síntoma | Causa |
+|----|---------|--------|
+| E1 | Loop intermitente ETAPA_1 (improvisación *«procesando»* / *«confirmamos listos»*) | Sin tool-first ETAPA_1; `{}` en duda; silencio backend ~10–23 s |
+| E2 | Agente verbaliza `POST_COMPARACION_CONTINUAR` tras ritual C11 | Token/flag expuesto en prompt y tool `description` |
+
+#### Fixes P0 (`b08e35c`) — cerrados
+
+| Fix | Archivo | Verificación |
+|-----|---------|--------------|
+| Tool-first ETAPA_1 + frases prohibidas | `chatSupervisor/index.ts` | Valores en 1.er intento sin loop |
+| REGLA POST-COMPARACIÓN; sin token en tool description | `chatSupervisor/index.ts` | Solo C11 audible; `auto_chain` sin jerga |
+
+**Nota ritual post-comparación:** C11 reemplazó el copy fijo *«Sigamos con este.»*; el contrato `postComparacionContinuar` + `auto_chain` se mantiene (Punto 1 §2.3.8).
+
+**Pendiente P1 (no bloqueante):** ack backend tras ETAPA_1; `audio_started` antes de nudge; Modo B cliente — ver `PLAN_COPY_NATURAL_AGENTE.md` Anexo E.
+
+---
+
 ### 4.1 `examen-registro-5.csv` — Bug 2 confirmado
 
 Resultados esféricos de OI al cierre del registro:
@@ -1408,6 +1445,8 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-14.csv`** — QA fix B3 OK post-fix (§4.0.6)
   - **`examen-registro-15.csv`** — QA fix B1 OK post-fix (§4.0.7); evidencia pre-fix B4 (l. 161–163)
   - **`examen-registro-16.csv`** — QA fix B4 OK post-fix (§4.0.8)
+  - **`examen-registro-17.csv`** — QA copy natural v1.0 + fixes P0 orquestación (§4.0.9)
+- `PLAN_COPY_NATURAL_AGENTE.md` — Copy rotativo C10–C12/C11; Anexos D (QA reg17) y E (fixes P0)
 - `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B1**, **B3** y **B4** cerrados; **B2** pendiente
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
