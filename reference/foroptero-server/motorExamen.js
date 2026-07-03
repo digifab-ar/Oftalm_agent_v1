@@ -1833,7 +1833,7 @@ async function procesarRespuestaPreGruesoVisual(respuestaPaciente, interpretacio
   };
 }
 
-const POST_COMPARACION_ESPERA_SEG = 3;
+const POST_COMPARACION_ESPERA_SEG = 6;
 
 function lensValorCerca(a, b) {
   if (a == null || b == null) return a === b;
