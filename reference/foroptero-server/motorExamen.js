@@ -2028,7 +2028,12 @@ export async function obtenerInstrucciones(respuestaPaciente = null, interpretac
         const testActual = estadoExamen.secuenciaExamen.testActual;
 
         const caraAntesUpdate = estado.valorActual;
-        estado.valorAnterior = estado.valorActual;
+        if (estado.cilindricoSecuencialBajo && estado.pasoSecuencialBajo === 2) {
+          // Paso 2 secuencial bajo: referencia = C1 (no el alternativo del paso 1 en cara)
+          estado.valorAnterior = estado.candidatoPaso1;
+        } else {
+          estado.valorAnterior = estado.valorActual;
+        }
         estado.valorActual = resultado.valorAMostrar;
         estado.faseComparacion = 'mostrando_alternativo';
 
