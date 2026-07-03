@@ -6,10 +6,10 @@ Documento de especificación acordada para el flujo binocular **simplificado** (
 
 ## 1. Objetivo
 
-Realizar un ajuste final **con ambos ojos abiertos**, en **dos pasos** secuenciales:
+Realizar un ajuste final **con ambos ojos abiertos**, en **hasta dos pasos** secuenciales:
 
-1. Comparación **esférica** (variante: mover esfera 0,50 D **hacia el cero** en cada ojo que no esté ya en 0).
-2. Comparación **cilíndrica** (variante: mover cilindro 0,50 D **hacia el cero** en cada ojo cuyo cilindro no sea 0), usando como base el resultado **ya resuelto** del paso esférico.
+1. Comparación **esférica** (variante: mover esfera 0,50 D **hacia el cero** en cada ojo que no esté ya en 0), **si** ese paso produce contraste en al menos un ojo (§7).
+2. Comparación **cilíndrica** (variante: mover cilindro 0,50 D **hacia el cero** en cada ojo cuyo cilindro no sea 0), usando como base el resultado **ya resuelto** del paso esférico (o la base inicial si el esférico se omitió), **si** aplica (§7).
 
 En cada paso el paciente indica si ve **mejor con la configuración anterior o con la actual** (o **igual**; ver §8).
 
@@ -85,12 +85,24 @@ Si el **cilindro** resultante es **0**, el **ángulo** se **fija en 0** (grado).
 
 ---
 
-## 7. Omisión del paso cilíndrico
+## 7. Omisión de pasos sin contraste
 
-Si **ambos** ojos tienen **cilindro 0** en la configuración activa al terminar el paso esférico:
+Si la **variante** de un paso no modifica ningún ojo (no-op global según §5), **no** se ejecuta ese paso: sin movimiento de foróptero para la variante, sin mensaje comparativo §11 y sin `interpretacionComparacion`.
 
-- **No** se ejecuta la segunda comparación.
-- El resultado binocular final es la configuración ya definida tras el paso esférico.
+### 7.1 Omisión del paso esférico
+
+Tras la confirmación «listo» (§2.3), si **ambas** esferas (R y L) son **0**:
+
+- **No** se ejecuta la comparación esférica.
+- `rxActiva` queda en la **base binocular** del paso.
+- Se continúa con la evaluación del paso cilíndrico (§7.2) o, si también aplica omisión cilíndrica, se confirma el resultado binocular.
+
+### 7.2 Omisión del paso cilíndrico
+
+Si **ambos** ojos tienen **cilindro 0** en la configuración activa al evaluar el paso cilíndrico (ya sea tras cerrar el esférico o tras omitirlo):
+
+- **No** se ejecuta la comparación cilíndrica.
+- El resultado binocular final es la configuración activa en ese momento.
 
 ---
 
@@ -121,7 +133,7 @@ Por cada ojo (R / L), al **finalizar** el binocular, guardar **esfera, cilindro 
 
 ## 11. Mensajes de voz (guion)
 
-En la implementación actual, **tras la transición “listo”**, el backend aplica primero la **variante** del paso (foróptero) y luego emite **un solo** `pasos[].mensaje` que combina el aviso y la pregunta comparativa, de modo que **el paciente ya tiene puestos los lentes de la variante** cuando oye el texto (coherente con “otro par” y con “anterior vs actual”).
+En la implementación actual, **tras la transición “listo”**, el backend aplica primero la **variante** del paso (foróptero) y luego emite **un solo** `pasos[].mensaje` que combina el aviso y la pregunta comparativa, de modo que **el paciente ya tiene puestos los lentes de la variante** cuando oye el texto (coherente con “otro par” y con “anterior vs actual”). **Los pasos omitidos según §7 no emiten este mensaje.**
 
 **Entre la respuesta de la comparación esférica y la fase cilíndrica** (si aplica), el ritual de reanclaje foróptero, pausa **3 s** y `Sigamos con este.` sigue el plan `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` **§4.3–§4.4**: con preferencia **anterior** (incluye `igual` mapeado a anterior) se reancla al resultado esférico elegido **sin TV** en ese tramo, luego pausa + mensaje, luego variante cilíndrica; con **actual**, **sin** reanclaje intermedio ni pausa/Sigamos antes del cilindro.
 
@@ -151,6 +163,7 @@ Mensaje de transición obligatorio (una sola vez al entrar a ETAPA_6 desde `agud
 
 Para cada comparación (esférico; luego cilíndrico si aplica), el flujo observable es:
 
+0. **Si el paso es no-op (§7):** omitir pasos 1–5 de esta lista y continuar con el siguiente paso aplicable o confirmar resultado.
 1. Aplicar **foróptero** con la **variante** del paso (0,50 hacia el cero, reglas §3–§5; ambos ojos abiertos).
 2. Esperar ready del foróptero.
 3. **TV:** H @ logMAR 0,3.

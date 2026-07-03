@@ -123,6 +123,7 @@ let estadoExamen = {
     rxVariante: null,     // variante 0,50 hacia el cero
     paso: null,           // 'esfera' | 'cilindro' | null
     faseBinocular: null,  // ver constantes FB_* en motor
+    omitirEsfera: false,
     omitirCilindro: false
   },
   
@@ -272,6 +273,7 @@ export function inicializarExamen(modo = 'normal') {
       rxVariante: null,
       paso: null,
       faseBinocular: null,
+      omitirEsfera: false,
       omitirCilindro: false
     },
     respuestaPendiente: null,
@@ -3594,6 +3596,39 @@ function ambosCilindrosCero(rx) {
   return cilindroEsCero(rx.R.cilindro) && cilindroEsCero(rx.L.cilindro);
 }
 
+function ambasEsferasCero(rx) {
+  const n = normalizarRxPar(rx);
+  return n.R.esfera === 0 && n.L.esfera === 0;
+}
+
+/** Paso ETAPA_6 sin contraste: la variante no altera ningún ojo (DEFINICIONES §7). */
+function varianteBinocularEsNoOp(rxBase, paso) {
+  if (paso === 'esfera') return ambasEsferasCero(rxBase);
+  if (paso === 'cilindro') return ambosCilindrosCero(normalizarRxPar(rxBase));
+  return false;
+}
+
+/**
+ * Tras cerrar u omitir el paso esférico binocular: preparar cilíndrico o confirmar.
+ * @returns {{ accion: 'mostrar_cil' | 'confirmar', rxActiva: object }}
+ */
+function prepararBinocularPostEsfera(estado, rxActiva) {
+  const rx = normalizarRxPar(copiarRxPar(rxActiva));
+  estado.rxActiva = rx;
+
+  if (ambosCilindrosCero(rx)) {
+    estado.omitirCilindro = true;
+    return { accion: 'confirmar', rxActiva: rx };
+  }
+
+  estado.rxBasePaso = copiarRxPar(rx);
+  estado.rxVariante = aplicarVarianteCilindrica(estado.rxBasePaso);
+  estado.paso = 'cilindro';
+  estado.faseBinocular = FB_CIL_MOSTRAR;
+  estado.omitirCilindro = false;
+  return { accion: 'mostrar_cil', rxActiva: rx };
+}
+
 /** Construye Rx de entrada a ETAPA_6 (examen normal vs testbin). */
 function construirRxBaseBinocular() {
   const resultados = estadoExamen.secuenciaExamen.resultados;
@@ -3677,6 +3712,7 @@ function binocularEstadoVacio() {
     rxVariante: null,
     paso: null,
     faseBinocular: null,
+    omitirEsfera: false,
     omitirCilindro: false
   };
 }
@@ -3685,6 +3721,8 @@ function contextoBinocularResumido(st) {
   return {
     paso: st.paso,
     faseBinocular: st.faseBinocular,
+    omitirEsfera: st.omitirEsfera ?? false,
+    omitirCilindro: st.omitirCilindro ?? false,
     rxActiva: st.rxActiva ? copiarRxPar(st.rxActiva) : null,
     rxBasePaso: st.rxBasePaso ? copiarRxPar(st.rxBasePaso) : null,
     rxVariante: st.rxVariante ? copiarRxPar(st.rxVariante) : null
@@ -3710,6 +3748,7 @@ function iniciarBinocular() {
     rxVariante: rxVar,
     paso: 'esfera',
     faseBinocular: FB_TRANS_LISTO,
+    omitirEsfera: false,
     omitirCilindro: false
   };
 
@@ -3831,6 +3870,16 @@ function procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion
 
   if (estado.faseBinocular === FB_TRANS_LISTO) {
     if (esRespuestaContinuidadBinocular(respuestaPaciente)) {
+      if (varianteBinocularEsNoOp(estado.rxBasePaso, 'esfera')) {
+        estado.omitirEsfera = true;
+        console.log('⏭️ Omitiendo paso esférico binocular (variante no-op, ambas esferas 0)');
+        const prep = prepararBinocularPostEsfera(estado, estado.rxBasePaso);
+        if (prep.accion === 'confirmar') {
+          return confirmarResultadoBinocular(prep.rxActiva);
+        }
+        return { ok: true, necesitaMostrarLente: true };
+      }
+      estado.omitirEsfera = false;
       estado.faseBinocular = FB_ESF_MOSTRAR;
       return { ok: true, necesitaMostrarLente: true };
     }
@@ -3871,13 +3920,10 @@ function procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion
   });
 
   if (estado.paso === 'esfera') {
-    if (ambosCilindrosCero(estado.rxActiva)) {
-      return confirmarResultadoBinocular(estado.rxActiva);
+    const prep = prepararBinocularPostEsfera(estado, estado.rxActiva);
+    if (prep.accion === 'confirmar') {
+      return confirmarResultadoBinocular(prep.rxActiva);
     }
-    estado.rxBasePaso = copiarRxPar(estado.rxActiva);
-    estado.rxVariante = aplicarVarianteCilindrica(estado.rxBasePaso);
-    estado.paso = 'cilindro';
-    estado.faseBinocular = FB_CIL_MOSTRAR;
     return {
       ok: true,
       necesitaMostrarLente: true,
