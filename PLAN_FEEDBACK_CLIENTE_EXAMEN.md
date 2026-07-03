@@ -28,6 +28,7 @@
    - [4.0.3 examen-registro-10 — QA Punto 2 OK](#403-examen-registro-10--qa-punto-2-ok-post-fix)
    - [4.0.4 examen-registro-11 — QA Punto 3 OK](#404-examen-registro-11--qa-punto-3-ok-post-fix)
    - [4.0.5 examen-registro-13 — QA Punto 4 OK](#405-examen-registro-13--qa-punto-4-ok-post-fix)
+   - [4.0.6 examen-registro-14 — QA fix B3 cilíndrico secuencial](#406-examen-registro-14--qa-fix-b3-cilíndrico-secuencial-post-fix)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -704,6 +705,16 @@ Archivo: `reference/foroptero-server/motorExamen.js`
 
 **Gate Punto 4:** ✅ cumplido — se puede iniciar ítem 3a (preajuste bilateral + R→L).
 
+#### 2.6.7 Fix B3 — `valorAnterior` en cilíndrico secuencial bajo paso 2 ✅
+
+**Contexto:** En `examen-registro-13` (§4.0.5), el cilíndrico OD con base `0` cerró en **−0,25** pese a que el paciente eligió «con el anterior» en el paso 2 (esperaba **0,0**). Diagnóstico y plan: `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` (B3).
+
+**Causa:** Tras paso 1, `obtenerInstrucciones` asignaba `valorAnterior = valorActual` (−0,25 en cara) en lugar de `candidatoPaso1` (0,0).
+
+**Fix:** commit `a7ca9ad` — en paso 2 de `cilindricoSecuencialBajo`, `valorAnterior = candidatoPaso1`.
+
+**QA post-fix:** `registros-examen/examen-registro-14.csv` (§4.0.6) — mismo protocolo; `Cilíndrico (R) = 0`; foróptero post paso 2 en `Cil +0.00`.
+
 ---
 
 
@@ -919,12 +930,49 @@ Durante todo el bloque OD (líneas 15–82): L permanece `(close)` sin cambios �
 | Test | R (OD) | L (OI) |
 |------|--------|--------|
 | Esférico fino | 0 | 0 |
-| Cilíndrico | **−0.25** | **−0.50** |
+| Cilíndrico | **−0.25** ⚠️ | **−0.50** |
 | Agudeza alcanzada | 0 | 0.3 |
 
 Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` (modo secuencial). Examen completo OD + OI + binocular sin errores.
 
+**Nota B3 (post-análisis):** `Cilíndrico (R) = −0.25` en este registro refleja el bug B3 (paso 2 secuencial bajo); corregido en `a7ca9ad`, evidencia post-fix en `examen-registro-14.csv` (§4.0.6).
+
 **Resultado:** ✅ **QA Punto 4 cerrado** con evidencia CSV archivada.
+
+---
+
+### 4.0.6 `examen-registro-14` — QA fix B3 cilíndrico secuencial (post-fix)
+
+**Archivo:** `registros-examen/examen-registro-14.csv`  
+**Sesión:** 2026-07-03, 11:01–11:15 (exportado 11:15)  
+**Valores iniciales:** `<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20`  
+**Valores recalculados:** `<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20`  
+**Estado al exportar:** FINALIZADO  
+**Contexto:** reproducción deliberada del tramo cilíndrico OD de registro-13 tras commit `a7ca9ad` (`fix(cilindrico): use C1 as reference in secuencial bajo step 2`).
+
+**Criterio B3 — paso 2 «con el anterior» confirma C1 (0,0):**
+
+| Timestamp | Línea | Evento | Foróptero OD |
+|-----------|-------|--------|--------------|
+| 11:04:37 | 47 | Fin esférico fino | `Esf +0.00 / Cil +0.00` |
+| 11:04:50 | 49–50 | Paso 1 secuencial: alternativo | `Cil −0.25` |
+| 11:04:58 | 52–54 | Paso 1: «con el anterior» | `Cil +0.00` (C1) ✓ |
+| 11:05:05 | 56–58 | Paso 2: alternativo fijo | `Cil −0.50` |
+| 11:05:14 | 59–61 | Paso 2: «con el anterior» | `Cil +0.00` ✅ (registro-13: `−0.25` ❌) |
+
+**Resultado al cierre:**
+
+| Test | R (OD) | L (OI) |
+|------|--------|--------|
+| Esférico fino | 0 | 0 |
+| Cilíndrico | **0** ✅ | −0.50 |
+| Agudeza alcanzada | 0.2 | 0.2 |
+
+**Contraste registro-13 vs 14:** misma secuencia de respuestas en cilíndrico OD; única divergencia en foróptero y resultado tras paso 2.
+
+**Smoke regresión:** cilíndrico OI bracket ±0,50 normal; examen completo FINALIZADO; Puntos 1–4 sin regresión observable.
+
+**Resultado:** ✅ **Fix B3 cerrado** — ver también `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` §8.
 
 ---
 
@@ -1283,7 +1331,9 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-9.csv`** — QA Punto 1 OK post-fix (§4.0.2)
   - **`examen-registro-10.csv`** — QA Punto 2 OK post-fix (§4.0.3)
   - **`examen-registro-11.csv`** — QA Punto 3 OK post-fix (§4.0.4)
-  - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5)
+  - **`examen-registro-13.csv`** — QA Punto 4 OK post-fix (§4.0.5); evidencia pre-fix B3 cilíndrico OD
+  - **`examen-registro-14.csv`** — QA fix B3 OK post-fix (§4.0.6)
+- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico (B1–B3); B3 cerrado
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`
 - `src/app/agentConfigs/chatSupervisor/index.ts` — Instrucciones del agente
 - `DOCUMENTACION.md` — Flujo ETAPA_1–6 y tests opcionales

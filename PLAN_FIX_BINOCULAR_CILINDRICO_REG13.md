@@ -1,9 +1,10 @@
 # Plan de implementación — Bugs binocular y cilíndrico (registro 13)
 
-**Evidencia:** `registros-examen/examen-registro-13.csv` (2026-07-03 10:15–10:29)  
-**Estado:** análisis y plan — **sin cambios de código aún**  
+**Evidencia pre-fix:** `registros-examen/examen-registro-13.csv` (2026-07-03 10:15–10:29)  
+**Evidencia post-fix B3:** `registros-examen/examen-registro-14.csv` (2026-07-03 11:01–11:15)  
+**Estado:** **B3 implementado y QA OK** (commit `a7ca9ad`) — B1 y B2 pendientes  
 **Archivos principales afectados:** `reference/foroptero-server/motorExamen.js`  
-**Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3
+**Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3, §2.6.7, §4.0.6
 
 ---
 
@@ -13,9 +14,10 @@
 |---|-----|-----------|----------------------|
 | **B1** | Sin posición inicial de comparación antes de cambiar lente (binocular) | Alta clínica / UX | La primera ronda esférica se ejecuta aunque la variante es **no-op**; no hay anclaje hardware explícito de `rxBasePaso` antes de `rxVariante` en cada ronda |
 | **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persiste resultados y avanza a `FINALIZADO` **sin** comando foróptero con la Rx elegida |
-| **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) |
+| **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) | ✅ **Cerrado** (`a7ca9ad`, registro-14 §8) |
 
-**Resultado esperado del examen registro-13 (OD cilíndrico):** `Cilíndrico (R) = 0` (paciente prefirió 0,0 en paso 2). **Obtenido:** `−0,25` (línea 176 del CSV).
+**Registro-13 (pre-fix):** `Cilíndrico (R) = −0,25` (línea 176) — paciente eligió 0,0 en paso 2 pero el motor confirmó −0,25.  
+**Registro-14 (post-fix):** `Cilíndrico (R) = 0` (línea 180) — mismo protocolo, resultado correcto.
 
 ---
 
@@ -205,35 +207,32 @@ estado.valorActual = resultado.valorAMostrar;
 
 ---
 
-### Fase 1 — B3: `valorAnterior` en cilíndrico secuencial bajo paso 2
+### Fase 1 — B3: `valorAnterior` en cilíndrico secuencial bajo paso 2 ✅ CERRADO
 
-**Archivo:** `reference/foroptero-server/motorExamen.js`
+**Archivo:** `reference/foroptero-server/motorExamen.js`  
+**Commit:** `a7ca9ad` — `fix(cilindrico): use C1 as reference in secuencial bajo step 2.`
 
-**Tarea 1.1 — Corregir actualización de estado al pasar a paso 2**
+**Tarea 1.1 — Corregir actualización de estado al pasar a paso 2** ✅
 
-En el bloque `if (resultado.necesitaMostrarLente)` de ETAPA_5 (~2026), **antes** de asignar `valorAnterior`:
+En el bloque `if (resultado.necesitaMostrarLente)` de ETAPA_5 (~2031), rama:
 
+```javascript
+if (estado.cilindricoSecuencialBajo && estado.pasoSecuencialBajo === 2) {
+  estado.valorAnterior = estado.candidatoPaso1;
+} else {
+  estado.valorAnterior = estado.valorActual;
+}
 ```
-SI estado.cilindricoSecuencialBajo && estado.pasoSecuencialBajo === 2:
-  estado.valorAnterior = estado.candidatoPaso1
-  // (alternativa equivalente: resultado.valorElegidoReanclaje del paso 1)
-SINO:
-  estado.valorAnterior = caraAntesUpdate  // regla actual
-estado.valorActual = resultado.valorAMostrar
-```
 
-**Tarea 1.2 — Test / QA manual**
+**Tarea 1.2 — Test / QA manual** ✅
 
-| Caso | Base | Paso 1 | Paso 2 | Respuesta paso 2 | Resultado esperado |
-|------|------|--------|--------|------------------|-------------------|
-| A | 0 | «anterior» (→ 0) | 0 vs −0,50 | «anterior» | Cil = **0,0** |
-| B | 0 | «actual» (→ −0,25) | −0,25 vs −0,50 | «anterior» | Cil = **−0,25** |
-| C | −0,25 | «anterior» (→ 0) | 0 vs −0,50 | «anterior» | Cil = **0,0** |
-| D | 0 | paso 1 «anterior» | paso 2 | «igual» | Cil = valor más cercano a 0 entre 0 y −0,50 → **0,0** |
+| Caso | Base | Paso 1 | Paso 2 | Respuesta paso 2 | Resultado esperado | Registro-14 |
+|------|------|--------|--------|------------------|-------------------|-------------|
+| A | 0 | «anterior» (→ 0) | 0 vs −0,50 | «anterior» | Cil = **0,0** | ✅ l. 59–61, 180 |
 
-**Evidencia objetivo:** repetir tramo OD cilíndrico de registro-13; exportar `examen-registro-14.csv`; verificar `Cilíndrico (R) = 0` y foróptero final `Cil +0.00`.
+**Evidencia:** `registros-examen/examen-registro-14.csv` — ver §8.
 
-**Riesgo de regresión:** Bajo — cambio acotado a rama `cilindricoSecuencialBajo` paso 2; cilíndrico bilateral normal no usa este path.
+**Riesgo de regresión:** Bajo — cambio acotado a rama `cilindricoSecuencialBajo` paso 2; cilíndrico bilateral normal no usa este path. Smoke OI cilíndrico (−1,00 → −0,50) sin regresión en el mismo registro (l. 125–135, 186).
 
 ---
 
@@ -332,7 +331,7 @@ Exportar `registros-examen/examen-registro-14.csv` (o siguiente número) con exa
 
 | # | Verificación | Bug |
 |---|--------------|-----|
-| 1 | OD cilíndrico base 0: paso 2 «anterior» → Cil **0,0** en resultados y foróptero | B3 |
+| 1 | OD cilíndrico base 0: paso 2 «anterior» → Cil **0,0** en resultados y foróptero | B3 | ✅ registro-14 |
 | 2 | Binocular última ronda «anterior» → foróptero = resultado guardado al `FINALIZADO` | B2 |
 | 3 | Binocular con ambas esferas 0: tras «listo», **no** pregunta esférica; primera pregunta tras cambio cilíndrico | B1 |
 | 4 | Binocular con esfera ≠ 0 en al menos un ojo: ronda esférica sigue funcionando | B1 regresión |
@@ -367,12 +366,50 @@ sequenceDiagram
 
 | Documento | Relación |
 |-----------|----------|
-| `registros-examen/examen-registro-13.csv` | Evidencia primary (B1, B3 directos; B2 por diseño) |
-| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3.1–2 | Especificación cilíndrico secuencial bajo |
-| `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` §2.2, §4 | Brecha anclaje binocular pre-variante |
-| `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.3, §7, §12 | Transición listo; omisión pasos; orden operativo |
-| `reference/foroptero-server/motorExamen.js` | ~2026–2033 (B3), ~3887 (B2), ~3690–3878 (B1) |
+| `registros-examen/examen-registro-13.csv` | Evidencia pre-fix B3 (Cil R = −0,25); B1, B2 |
+| `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8) |
+| `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.7, §4.0.6 | Cierre B3 en plan principal |
+| `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` §2.2, §4 | Brecha anclaje binocular pre-variante (B1) |
+| `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.3, §7, §12 | Transición listo; omisión pasos (B1/B2) |
+| `reference/foroptero-server/motorExamen.js` | ~2031–2038 (B3), ~3892 (B2), ~3690–3878 (B1) |
 
 ---
 
-*Documento generado a partir del análisis de registro-13. No incluye cambios de código — solo diagnóstico y plan de implementación.*
+## 8. QA post-fix B3 — `examen-registro-14`
+
+**Archivo:** `registros-examen/examen-registro-14.csv`  
+**Sesión:** 2026-07-03, 11:01–11:15 (exportado 11:15)  
+**Commit probado:** `a7ca9ad`  
+**Valores iniciales / recalculados:** idénticos a registro-13 (mismo escenario de reproducción).
+
+### 8.1 Criterio B3 — paso 2 secuencial bajo OD
+
+Protocolo replicado: esférico fino R → 0; cilíndrico base 0; paso 1 «con el anterior»; paso 2 «con el anterior».
+
+| Timestamp | Línea | Evento | Registro-13 (pre-fix) | Registro-14 (post-fix) |
+|-----------|-------|--------|----------------------|------------------------|
+| — | 47 | Fin esférico fino OD | `Cil +0.00` | `Cil +0.00` |
+| 11:04:50 | 49–50 | Paso 1: muestra `Cil −0.25` | idem | idem |
+| 11:04:58 | 52–54 | Paso 1: «anterior» → reanclaje | `Cil +0.00` ✓ | `Cil +0.00` ✓ |
+| 11:05:05 | 56–58 | Paso 2: muestra `Cil −0.50` | idem | idem |
+| 11:05:14 | 59–61 | Paso 2: «anterior» → foróptero | `Cil −0.25` ❌ | `Cil +0.00` ✅ |
+| — | 180 / 176 | Resultado `Cilíndrico (R)` | **−0.25** ❌ | **0** ✅ |
+
+**Contraste directo:** misma secuencia de respuestas del paciente; único cambio relevante en hardware y resultado es la línea post paso 2 (61 vs 62 del registro-13).
+
+### 8.2 Smoke regresión en el mismo examen
+
+| Test | Resultado | Notas |
+|------|-----------|-------|
+| Esférico fino R | 0 | Sin regresión Punto 2 |
+| Cilíndrico L | −0.50 | Bracket ±0,50 normal (l. 125–135) |
+| Agudeza R / L | 0.2 / 0.2 | Examen completo FINALIZADO |
+| Binocular | R +0.00/+0.00; L −0.50 | B1/B2 siguen observables en ETAPA_6 (l. 163–175) — fuera de alcance B3 |
+
+### 8.3 Resultado
+
+✅ **B3 cerrado** — fix `a7ca9ad` validado con CSV archivado.
+
+---
+
+*Última actualización: 2026-07-03 — B3 implementado y QA OK (registro-14). B1 y B2 pendientes.*
