@@ -6,7 +6,10 @@ import {
 } from '@openai/agents/realtime';
 
 import { applyCodecPreferences } from '../lib/codecUtils';
-import { attachPostComparacionContinuarHandlers } from '../lib/postComparacionContinuar';
+import {
+  attachPostComparacionContinuarHandlers,
+  type OutputAudioTranscriptDoneEvent,
+} from '../lib/postComparacionContinuar';
 import { useEvent } from '../contexts/EventContext';
 import { useHandleSessionHistory } from './useHandleSessionHistory';
 import { SessionStatus } from '../types';
@@ -29,6 +32,9 @@ export interface ConnectOptions {
 export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
   const sessionRef = useRef<RealtimeSession | null>(null);
   const postComparacionCleanupRef = useRef<(() => void) | null>(null);
+  const postComparacionOnTranscriptDoneRef = useRef<
+    ((event: OutputAudioTranscriptDoneEvent) => void) | null
+  >(null);
   const [status, setStatus] = useState<
     SessionStatus
   >('DISCONNECTED');
@@ -55,6 +61,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
         break;
       }
       case "response.output_audio_transcript.done": {
+        postComparacionOnTranscriptDoneRef.current?.(event);
         historyHandlers.handleTranscriptionCompleted(event);
         break;
       }
@@ -157,10 +164,14 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
 
       if (enablePostComparacionAutoChain) {
         postComparacionCleanupRef.current?.();
-        postComparacionCleanupRef.current = attachPostComparacionContinuarHandlers(
+        postComparacionOnTranscriptDoneRef.current = null;
+        const postComparacionHandlers = attachPostComparacionContinuarHandlers(
           sessionRef.current,
           logClientEvent,
         );
+        postComparacionCleanupRef.current = postComparacionHandlers.cleanup;
+        postComparacionOnTranscriptDoneRef.current =
+          postComparacionHandlers.onOutputAudioTranscriptDone;
       }
 
       updateStatus('CONNECTED');
@@ -171,6 +182,7 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
   const disconnect = useCallback(() => {
     postComparacionCleanupRef.current?.();
     postComparacionCleanupRef.current = null;
+    postComparacionOnTranscriptDoneRef.current = null;
     sessionRef.current?.close();
     sessionRef.current = null;
     updateStatus('DISCONNECTED');
