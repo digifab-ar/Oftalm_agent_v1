@@ -24,24 +24,14 @@ function parseToolResult(result: unknown): Record<string, unknown> | null {
   return null;
 }
 
-export type OutputAudioTranscriptDoneEvent = {
-  transcript?: string | null;
-};
-
-export interface PostComparacionContinuarHandlers {
-  cleanup: () => void;
-  /** Fix B (P1-F6): disparar tras `response.output_audio_transcript.done`, no `audio_stopped`. */
-  onOutputAudioTranscriptDone: (event: OutputAudioTranscriptDoneEvent) => void;
-}
-
 /**
  * Tras postComparacionContinuar el agente debe encadenar obtenerEtapa({}) al terminar TTS de C11.
- * La pausa clínica arranca en `response.output_audio_transcript.done` (fin real del monólogo).
+ * Si el modelo no lo hace solo, el cliente envía una señal interna al detectar audio_stopped.
  */
 export function attachPostComparacionContinuarHandlers(
   session: RealtimeSession,
   logClientEvent: (obj: Record<string, unknown>, suffix?: string) => void,
-): PostComparacionContinuarHandlers {
+): () => void {
   let pending = false;
   let nudgeScheduled = false;
   let nudgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -54,23 +44,11 @@ export function attachPostComparacionContinuarHandlers(
     nudgeScheduled = false;
   };
 
-  const scheduleNudge = () => {
-    clearNudgeTimeout();
-    nudgeScheduled = true;
-    nudgeTimeoutId = setTimeout(() => {
-      nudgeTimeoutId = null;
-      nudgeScheduled = false;
-      logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
-      session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
-    }, POST_COMPARACION_CLIENT_PAUSE_MS);
-  };
-
   const onToolEnd = (_ctx: unknown, _agent: unknown, tool: { name?: string }, result: unknown) => {
     if (tool?.name !== 'obtenerEtapa') return;
     const parsed = parseToolResult(result);
     const contexto = parsed?.contexto as Record<string, unknown> | undefined;
     if (contexto?.postComparacionContinuar === true) {
-      clearNudgeTimeout();
       pending = true;
     }
   };
@@ -90,21 +68,27 @@ export function attachPostComparacionContinuarHandlers(
     }
   };
 
-  const onOutputAudioTranscriptDone = (_event: OutputAudioTranscriptDoneEvent) => {
+  const onAudioStopped = () => {
     if (!pending) return;
     pending = false;
-    scheduleNudge();
+    clearNudgeTimeout();
+    nudgeScheduled = true;
+    nudgeTimeoutId = setTimeout(() => {
+      nudgeTimeoutId = null;
+      nudgeScheduled = false;
+      logClientEvent({ type: 'post_comparacion_continuar_nudge' }, 'auto_chain');
+      session.sendMessage(POST_COMPARACION_CONTINUAR_NUDGE);
+    }, POST_COMPARACION_CLIENT_PAUSE_MS);
   };
 
   session.on('agent_tool_end', onToolEnd);
   session.on('agent_tool_start', onToolStart);
+  session.on('audio_stopped', onAudioStopped);
 
-  const cleanup = () => {
+  return () => {
     clearNudgeTimeout();
-    pending = false;
     session.removeListener('agent_tool_end', onToolEnd);
     session.removeListener('agent_tool_start', onToolStart);
+    session.removeListener('audio_stopped', onAudioStopped);
   };
-
-  return { cleanup, onOutputAudioTranscriptDone };
 }

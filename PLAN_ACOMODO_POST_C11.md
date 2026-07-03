@@ -327,7 +327,6 @@ Archivar CSV + captura logs UI como `examen-registro-NN.csv` con nota en este pl
 | **D03** | C11 v2 con copy prospectivo (*"quedate con este lente"*) | ✅ Cerrada |
 | **D04** | Hardening `nudgeScheduled` obligatorio (anti doble `obtenerEtapa`) | ✅ Cerrada |
 | **D05** | No gatear VAD durante pausa (igual que Fase 1b) | ✅ Cerrada |
-| **D08** | Fix B (P1-F6): pausa tras `response.output_audio_transcript.done`, no `audio_stopped` | ✅ Cerrada |
 | **D06** | Espera en deferred servidor como fallback — solo si QA muestra llamadas tempranas del modelo | Abierta |
 | **D07** | Validación tono C11 v2 con operador clínico | Pendiente |
 
@@ -377,4 +376,3 @@ Archivar CSV + captura logs UI como `examen-registro-NN.csv` con nota en este pl
 |---------|-------|--------|
 | 1.0 | 2026-07-03 | Plan inicial Opción B + análisis fricción `obtenerEtapa` anticipado |
 | 1.1 | 2026-07-03 | Implementado: motor M1–M5, cliente C1–C3, prompt A1–A2 |
-| 1.2 | 2026-07-03 | Fix B (P1-F6): timer post-C11 en `output_audio_transcript.done` |
