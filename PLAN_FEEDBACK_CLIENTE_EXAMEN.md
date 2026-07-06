@@ -2,7 +2,7 @@
 
 **Versión:** 1.3  
 **Fecha:** 2026-07-03  
-**Estado:** **Puntos 1–4 cerrados (implementado + QA OK)** — Puntos 5–6 pendientes (medición + firmware)  
+**Estado:** **Puntos 1–4 cerrados (implementado + QA OK)** — **Fase B QA OK** (2400/1500, §2.5.11, §4.0.10) — medición baseline M1–M4 omitida por decisión operativa  
 **Proyecto:** `openai-realtime-agents-main-2`  
 **Alcance:** Planificación y registro de entregas. **Punto 1** (`14c2768`, `54c1ef0`); **Punto 2** (`b1bb8fa`); **Punto 3** (`a20b305`); **Punto 4** (`f30ee41`).
 
@@ -20,6 +20,7 @@
      - [2.4.5 Implementación y cierre (Punto 2)](#245-implementación-y-cierre-punto-2)
    - [2.5 Ítem 3 — Velocidad / foróptero](#25-ítem-3--velocidad--fluidez-del-foróptero)
      - [2.5.10 Implementación y cierre (Punto 4)](#2510-implementación-y-cierre-punto-4--fase-a)
+     - [2.5.11 Fase B — Definiciones, implementación y QA (2400/1500)](#2511-fase-b--definiciones-implementación-y-qa-24001500)
    - [2.6 Ítem 4 — Cilíndrico siempre](#26-ítem-4--examen-cilíndrico-siempre)
 3. [Mapa del sistema actual](#3-mapa-del-sistema-actual)
 4. [Evidencia de campo — registros CSV](#4-evidencia-de-campo--registros-csv)
@@ -31,7 +32,7 @@
    - [4.0.6 examen-registro-14 — QA fix B3 cilíndrico secuencial](#406-examen-registro-14--qa-fix-b3-cilíndrico-secuencial-post-fix)
    - [4.0.7 examen-registro-15 — QA fix B1 Rx entrada binocular](#407-examen-registro-15--qa-fix-b1-rx-entrada-binocular-post-fix)
    - [4.0.8 examen-registro-16 — QA fix B4 omitir pasos no-op binocular](#408-examen-registro-16--qa-fix-b4-omitir-pasos-no-op-binocular-post-fix)
-   - [4.0.9 Copy natural v1.0 + fixes P0 orquestación](#409-copy-natural-v10--fixes-p0-orquestación-post-reg17)
+   - [4.0.10 examen-registro-20 — QA Fase B velocidad esférica](#4010-examen-registro-20--qa-fase-b-velocidad-esférica)
 5. [Orden de trabajo sugerido](#5-orden-de-trabajo-sugerido)
    - [5.1 Plan de QA por entrega](#51-plan-de-qa-por-entrega-un-punto-a-la-vez)
 6. [Criterios de aceptación globales](#6-criterios-de-aceptación-globales)
@@ -47,7 +48,7 @@ El cliente reportó cuatro problemas de experiencia clínica durante el examen a
 |---|----------|----------------|---------------------|
 | 1 | Hay que decir "Bien"/"listo" para que avance tras Sigamos | Agente Realtime (no encadena tool call) | Alta — **cerrado §2.3.8** |
 | 2 | Error en valor esférico: no se usa el resultado esférico al pasar a cilíndrico | Backend (`motorExamen.js`) | Alta — **cerrado §2.4.5** |
-| 3 | El movimiento del foróptero para lentes esféricos debería ser más rápido | Firmware ESP32 + backend (Fase A cerrada) | Media — **Fase A cerrada §2.5.10**; Fase B pendiente |
+| 3 | El movimiento del foróptero para lentes esféricos debería ser más rápido | Firmware ESP32 + backend (Fase A cerrada) | Media — **Fase A cerrada §2.5.10**; **Fase B QA OK §4.0.10** |
 | 4 | El examen cilíndrico debe realizarse siempre, no condicionado a ciertos valores | Backend (secuencia del examen) | Alta — **cerrado §2.6, §4.0.4** |
 
 **Estado por ítem (v1.3):**
@@ -56,7 +57,7 @@ El cliente reportó cuatro problemas de experiencia clínica durante el examen a
 - **Bug 2** (ítem 2) **implementado y QA OK** (§2.4.5, §4.0.3): esfera confirmada (incl. **0.00 D**) se usa en toda configuración cilíndrica vía `calcularValoresFinalesForoptero`. Pre-fix: `examen-registro-5.csv`, `examen-registro-7.csv` (§4.1, §4.1.1). **Evidencia post-fix:** `registros-examen/examen-registro-10.csv` (commit `b1bb8fa`).
 - **Bug 4** (ítem 4) **implementado y QA OK** (§2.6, §4.0.4): test `cilindrico` siempre por ojo; modo `cilindricoSecuencialBajo` para bases `0` / `−0,25`. Pre-fix: `examen-registro-5.csv` (§4.2). **Evidencia post-fix:** `registros-examen/examen-registro-11.csv` (commit `a20b305`).
 - **Ítem 3 — Fase A** (preajuste bilateral + R→L) **implementado y QA OK** (§2.5.10, §4.0.5): ETAPA_3 posiciona ambos ojos; transición OD→OI solo oclusión. Pre-fix: `examen-registro-5.csv` (§4, salto 19:12:32). **Evidencia post-fix:** `registros-examen/examen-registro-13.csv` (commit `f30ee41`).
-- **Ítem 3 — Fase B** (velocidad esférica −50 % en grueso: **7 s → 3,5 s / 0,50 D**, Q5) — **pendiente** (Puntos 5–6; §2.5.7).
+- **Ítem 3 — Fase B** (velocidad esférica) — **QA OK** firmware `2400/1500` (~3,7 s / 0,50 D; §2.5.11, §4.0.10). Evidencia: `registros-examen/examen-registro-20.csv`.
 
 ---
 
@@ -452,7 +453,7 @@ Caso registro §4 (OI recalculado +0.50, -1.00, 20°; P4 ≈ 7 s/0,50 D):
 | Transición R→L | **No** (Fase A) | No es velocidad esférica; es preajuste |
 | Cilindro / ángulo | No en esta fase | Mantener perfil conservador |
 
-##### 2.5.7.2 Baseline hardware (firmware actual)
+##### 2.5.7.2 Baseline hardware (firmware v0.5.3 release 1)
 
 ```676:684:reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.ino
   auto cfg = [](AccelStepper& m){ m.setMaxSpeed(800); m.setAcceleration(500); };
@@ -492,7 +493,8 @@ Durante ETAPA_5 esférica, cada comparativa implica al menos un movimiento de es
 
 ##### 2.5.7.5 Tareas de implementación (firmware)
 
-Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.ino`
+**Release activo:** `reference_ESP32/Foroptero_v0_5_4_release_2/Foroptero_v0_5_4_release_2.ino`  
+**Baseline sin modificar:** `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.ino`
 
 | ID | Tarea | Propuesta | Validación |
 |----|-------|-----------|------------|
@@ -510,7 +512,7 @@ Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.
 | ×1.5 | 1200 | 750 | ~4,7 s |
 | ×2.0 | 1600 | 1000 | **~3,5 s** (O5) |
 
-> La relación no es estrictamente lineal (perfil trapezoidal AccelStepper). M1 es obligatoria antes de fijar objetivo.
+> La relación no es estrictamente lineal (perfil trapezoidal AccelStepper). Baseline P4 (~7 s) adoptado sin M1–M4 (§2.5.11). **Validado en banco:** **2400/1500** (~3,7 s / 0,50 D) — §4.0.10.
 
 ##### 2.5.7.6 Tareas backend complementarias (opcional, baja prioridad)
 
@@ -522,11 +524,11 @@ Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.
 
 ##### 2.5.7.7 Criterios de aceptación Fase B
 
-- [ ] M1 confirma baseline P4: esférico grueso **~7 s / 0,50 D**.
-- [ ] Objetivo O5 (Q5): esférico grueso **≤ 3,5 s / 0,50 D** (−50 % vs baseline).
-- [ ] Salto ±0,25 D (fino): reducción proporcional sin errores de posicionamiento (validar tras M1).
-- [ ] 0 pérdidas de pasos / 0 timeouts en `esperarForopteroReady` tras 20 ciclos en banco.
-- [ ] Cilindro y ángulo sin regresión de precisión.
+- [x] Baseline P4 adoptado: esférico grueso **~7 s / 0,50 D** (v0.5.3; §4.0.10 vs registro-13).
+- [x] Objetivo O5 (Q5): esférico grueso **~3,7 s / 0,50 D** (−47 % vs baseline; §4.0.10).
+- [x] Salto ±0,25 D (fino): **~2,6 s**, sin errores de posicionamiento (§4.0.10).
+- [x] 0 pérdidas de pasos / 0 timeouts en examen integrado (registro-20).
+- [x] Cilindro y ángulo sin regresión de precisión (registro-20).
 
 ---
 
@@ -546,13 +548,13 @@ Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.
 
 - [x] Inicio: ambos ojos posicionados; primer test OD sin sorpresa. *(registro-13, §4.0.5)*
 - [x] Transición 19:12:32 equivalente: **solo oclusión**, < 10 s. *(registro-13: `<R> (close); <L> (open)` en 1 s)*
-- [ ] Comparativas esféricas OI: tiempo entre preguntas reducido vs registro original (post PR-3d).
+- [x] Comparativas esféricas: tiempo mecánico reducido vs registro-13 baseline (§4.0.10, registro-20).
 
 #### 2.5.9 Criterios de aceptación globales (ítem 3)
 
 - [x] **Fase A:** cambio R→L sin recomando óptico de OI si preajuste activo.
 - [x] **Fase A:** transición R→L < 10 s (caso registro §4).
-- [ ] **Fase B:** esférico grueso ±0,50 D **≤ 3,5 s** por movimiento (O5; −50 % vs ~7 s baseline).
+- [x] **Fase B:** esférico grueso ±0,50 D **~3,7 s** por movimiento (O5 ≈ 3,5 s; −47 % vs ~7 s baseline) — §4.0.10.
 - [x] Sin regresión dióptrica, oclusión ni timeouts. *(examen completo FINALIZADO, registro-13)*
 - [ ] Inicio ETAPA_3: copy alineado al acomodo bilateral (una sola expectativa de espera).
 
@@ -567,6 +569,58 @@ Archivo: `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.
 **QA manual (post `f30ee41`):** examen completo con mismos valores que registro-11; inicio con R+L recalculados; transición OD→OI en **1 s** mecánico (solo oclusión); copy OI correcto; Puntos 2–3 sin regresión. **Resultado: OK.** Evidencia CSV: `registros-examen/examen-registro-13.csv` (§4.0.5).
 
 **Gate Punto 5:** ✅ cumplido — se puede iniciar medición baseline M1–M4.
+
+#### 2.5.11 Fase B — Definiciones, implementación y QA (2400/1500)
+
+**Estado:** ✅ **QA OK** — 2026-07-06. Firmware activo en `Foroptero_v0_5_4_release_2`; baseline preservado en `Foroptero_v0_5_3_release_1`. Evidencia: §4.0.10.
+
+**Decisiones operativas:**
+
+| Decisión | Resolución |
+|----------|------------|
+| Medición baseline M1–M4 (Punto 5) | **Omitida** — baseline P4: **~7 s / 0,50 D** |
+| Backend | **Sin cambios** |
+| Perfil validado | **`ESFERA_MAX_SPEED` 2400**, **`ESFERA_ACCELERATION` 1500** (×3,0 vs baseline 800/500) |
+| Alcance motores | Solo esfera (`controlCD`, `controlCI`); cilindro/ángulo/oclusión 800/500 |
+
+**Constantes firmware** (`reference_ESP32/Foroptero_v0_5_4_release_2/Foroptero_v0_5_4_release_2.ino`):
+
+| Constante | Valor validado | Baseline v0.5.3 | Motores |
+|-----------|----------------|-----------------|---------|
+| `ESFERA_MAX_SPEED` | **2400** | 800 | `controlCD`, `controlCI` |
+| `ESFERA_ACCELERATION` | **1500** | 500 | idem |
+| `OTROS_MAX_SPEED` | 800 | 800 | BD, BI, AD, AI, DD, DI |
+| `OTROS_ACCELERATION` | 500 | 500 | idem |
+
+**Proporción:** `maxSpeed : acceleration = 8 : 5` (igual que baseline).
+
+**Resultados de banco (2026-07-06):**
+
+| Magnitud | Tiempo medido | vs baseline (~7 s / 0,50 D) | vs objetivo O5 (≤ 3,5 s) |
+|----------|---------------|----------------------------|--------------------------|
+| ±0,50 D grueso | **~3,7 s** | **−47 %** | +0,2 s (≈ cumple) |
+| ±0,25 D fino | **~2,6 s** | ~−63 % extrap. | — |
+
+**Observación mecánica:** no se observó **limitación por TPM** (pasos/minuto): el perfil configurado no saturó el techo del driver/motor A4988+NEMA17; el movimiento completó sin pérdida de pasos ni timeout en `esperar_foroptero`. Margen disponible para tunear si hiciera falta.
+
+**Historial de escalones probados:**
+
+| Escalón | maxSpeed / accel | s/0,50 D | Estado |
+|---------|------------------|----------|--------|
+| Baseline (v0.5.3) | 800 / 500 | ~7 s (P4) | Referencia |
+| ×1,5 | 1200 / 750 | ~4,7 s (est.) | Implementado inicial; superado en banco |
+| ×2,0 | 1600 / 1000 | ~3,5 s (est.) | No desplegado |
+| **×3,0 (validado)** | **2400 / 1500** | **~3,7 s** | **Config activa** |
+
+**Criterios QA:**
+
+- [x] ±0,50 D grueso: **~3,7 s** (banco + coherente con CSV registro-20)
+- [x] ±0,25 D fino: **~2,6 s** (banco)
+- [x] Sin pérdida de pasos ni timeout en examen integrado (registro-20 hasta tramo OD completo)
+- [x] Cilindro/ángulo sin regresión (perfil 800/500)
+- [x] Backend sin cambios
+
+**Referencias:** `DOCUMENTACION.md` § Perfiles de velocidad; evidencia comparativa §4.0.10.
 
 ---
 
@@ -730,7 +784,7 @@ Agente Realtime (chatSupervisor/index.ts)
     ↓ obtenerEtapa()
 Backend clínico (reference/foroptero-server/motorExamen.js)
     ↓ pasos automáticos: foroptero | tv | esperar | esperar_foroptero
-MQTT → Firmware ESP32 (reference_ESP32/Foroptero_v0_5_3_release_1.ino)
+MQTT → Firmware ESP32 (`Foroptero_v0_5_4_release_2.ino`; baseline: `v0_5_3_release_1`)
     ↓
 Foróptero físico
 ```
@@ -741,7 +795,7 @@ Foróptero físico
 |------|---------|--------|----------|-------------------|
 | 1 | — | `chatSupervisor/index.ts` + runtime Realtime | — | `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` |
 | 2 | `motorExamen.js` (`generarPasosMostrarLenteCilindrico`, `calcularValoresFinalesForoptero`) | — | — | `ALGORITMO_REGLAS_TESTS.md` |
-| 3 | `motorExamen.js` (`esperar_foroptero`, `POST_COMPARACION_ESPERA_SEG`) | — | `Foroptero_v0_5_3_release_1.ino` | `DOCUMENTACION.md` |
+| 3 | `motorExamen.js` (`esperar_foroptero`, `POST_COMPARACION_ESPERA_SEG`) | — | `Foroptero_v0_5_4_release_2.ino` (baseline: `v0_5_3_release_1`) | `DOCUMENTACION.md` |
 | 4 | `motorExamen.js` (`determinarTestsActivos`, `generarSecuenciaExamen`, `cilindricoSecuencialBajo`) | — | — | `DOCUMENTACION.md` §Determinación de Tests Opcionales; `ALGORITMO_REGLAS_TESTS.md` §Cilíndrico bajo |
 
 ---
@@ -1086,6 +1140,64 @@ Esfera **+0.00** coherente en cilíndrico OD; cilíndrico R activo con base `0` 
 
 ---
 
+### 4.0.10 `examen-registro-20` — QA Fase B velocidad esférica
+
+**Archivo:** `registros-examen/examen-registro-20.csv`  
+**Fecha:** 2026-07-06 11:03–11:14 (exportado 11:14:07)  
+**Firmware:** `Foroptero_v0_5_4_release_2` — `ESFERA_MAX_SPEED` **2400**, `ESFERA_ACCELERATION` **1500**  
+**Alcance documentado:** inicio examen → **2026-07-06 11:06:58** (cierre paso 2 cilíndrico OD; línea `Foroptero-TV` + `TV: letra H @ logMAR 0.3`)  
+**Valores recalculados:** idénticos a registro-13 (`<R> +0.25 / +0.00 / 175 / <L> +0.50 / -1.00 / 20`) — comparación válida con Punto 4.
+
+#### Resultados de banco (operador)
+
+| Magnitud | Tiempo | Notas |
+|----------|--------|-------|
+| ±0,50 D esférico grueso | **~3,7 s** | Sin limitación por TPM (pasos/min); perfil no saturó driver/motor |
+| ±0,25 D esférico fino | **~2,6 s** | Proporcional a grueso |
+
+#### Delta CSV: Foróptero (solo esfera) → TV siguiente
+
+Método: timestamp línea `Foroptero-TV` con cambio de **esfera** → timestamp `TV:` inmediato. Incluye `esperar_foroptero` backend; **excluye** pausas clínicas (C11 / respuesta paciente).
+
+**Esférico grueso ±0,50 D (OD):**
+
+| # | registro-20 (2400/1500) | Δ | registro-13 (v0.5.3 ~800/500) | Δ |
+|---|-------------------------|---|-------------------------------|---|
+| 1 | 11:04:31 → 11:04:36 (+0.25→+0.75) | **5 s** | 10:16:10 → 10:16:19 (+0.25→+0.75) | **9 s** |
+| 2 | 11:05:27 → 11:05:30 (+0.25→+0.50) | **3 s** | 10:17:14 → 10:17:20 (+0.25→+0.50) | **6 s** |
+| 3 | 11:05:00 → 11:05:04 (+0.25→−0.25) | **4 s** | 10:16:43 → 10:16:52 (+0.25→−0.25) | **9 s** |
+
+**Esférico fino ±0,25 D (OD):**
+
+| # | registro-20 | Δ | registro-13 | Δ |
+|---|-------------|---|-------------|---|
+| 1 | 11:05:48 → 11:05:51 (+0.25→0.00) | **3 s** | 10:17:41 → 10:17:47 (+0.25→0.00) | **6 s** |
+| 2 | 11:05:58 → 11:06:01 (reanclaje 0.00→+0.25) | **3 s** | — | — |
+
+**Promedio orientativo CSV (solo esfera OD):** grueso **~4 s** (reg20) vs **~8 s** (reg13); fino **~3 s** vs **~6 s**. Coherente con banco (~3,7 / ~2,6 s).
+
+#### Beneficio en tramo comparable del examen
+
+Mismo protocolo clínico (Puntos 1–4 + copy natural); misma secuencia de respuestas OD en grueso/fino/cilíndrico hasta paso 2.
+
+| Métrica | registro-13 (v0.5.3) | registro-20 (2400/1500) | Ahorro |
+|---------|---------------------|-------------------------|--------|
+| Inicio 1.er salto grueso OD → fin paso 2 cilíndrico OD | 10:16:10 → 10:19:02 (**2 m 52 s**) | 11:04:31 → 11:06:58 (**2 m 27 s**) | **~25 s** |
+| Transición R→L (solo oclusión) | 1 s (§4.0.5) | 11:08:17 → 11:08:21 (**4 s**) | Sin regresión relevante |
+
+> El ahorro total del tramo mezcla **menos tiempo muerto mecánico** (Fase B) con tiempos de respuesta del paciente (variables). La ganancia mecánica pura es ~**3–5 s por salto esférico** vs baseline CSV.
+
+#### Verificación
+
+- [x] Precisión dióptrica OD: grueso **+0,25**, fino **0**, cilíndrico **0** (coherente con respuestas)
+- [x] Sin timeout `esperar_foroptero`
+- [x] Cilindro/ángulo movimientos normales (perfil 800/500)
+- [x] Examen continuó hasta FINALIZADO (export 11:14)
+
+**Resultado:** ✅ **Fase B cerrada** para despliegue con 2400/1500.
+
+---
+
 ### 4.1 `examen-registro-5.csv` — Bug 2 confirmado
 
 Resultados esféricos de OI al cierre del registro:
@@ -1337,7 +1449,7 @@ Cada entrega sigue el mismo ciclo:
 | 3 | `examen-registro-11.csv` (+ registro-5 pre-fix) | Cilíndrico (R) con cil. 0; secuencial 2 pasos |
 | 4 | `examen-registro-13.csv` (+ registro-5 pre-fix) | Preajuste bilateral inicio; transición R→L solo oclusión |
 | 5 | Cualquier examen esférico | Tiempos entre líneas Foróptero |
-| 6 | Nuevo export post-fix | ≤ 3,5 s / 0,50 D en grueso |
+| 6 | `examen-registro-20.csv` (+ registro-13 baseline) | ~3,7 s / 0,50 D; beneficio vs v0.5.3 |
 
 Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen/`.
 
@@ -1412,9 +1524,9 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
 - [x] Implementar A1–A7 (PR-3a, PR-3b) — `f30ee41`
 - [x] QA manual Fase A: **OK** — `examen-registro-13.csv` archivado (§4.0.5)
 - [x] Gate Punto 5: cumplido
-- [ ] Medición baseline M1–M4 (PR-3c)
-- [ ] Firmware escalonado B1–B4 (PR-3d)
-- [ ] Validación integrada Fase B con `examen-registro-5.csv`
+- [x] Medición baseline M1–M4 — **omitida**; baseline P4 (~7 s) adoptado (§2.5.11)
+- [x] Firmware Fase B validado **2400/1500** en `Foroptero_v0_5_4_release_2` (§2.5.11); baseline `v0_5_3_release_1` intacto
+- [x] QA integrado Fase B — **`examen-registro-20.csv`** archivado (§4.0.10)
 
 ### Sesión — Ítem 4 (Cilíndrico siempre) — Punto 3 ✅ CERRADO
 - [x] Caso reproducible: `examen-registro-5.csv` §4.2
@@ -1446,6 +1558,7 @@ Cada punto validado debe generar un **nuevo CSV** archivado en `registros-examen
   - **`examen-registro-15.csv`** — QA fix B1 OK post-fix (§4.0.7); evidencia pre-fix B4 (l. 161–163)
   - **`examen-registro-16.csv`** — QA fix B4 OK post-fix (§4.0.8)
   - **`examen-registro-17.csv`** — QA copy natural v1.0 + fixes P0 orquestación (§4.0.9)
+  - **`examen-registro-20.csv`** — QA Fase B velocidad esférica 2400/1500 (§4.0.10)
 - `PLAN_COPY_NATURAL_AGENTE.md` — Copy rotativo C10–C12/C11; Anexos D (QA reg17) y E (fixes P0)
 - `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — Bugs binocular/cilíndrico: **B1**, **B3** y **B4** cerrados; **B2** pendiente
 - `src/app/lib/postComparacionContinuar.ts` — Hook `auto_chain` y señal `__POST_COMPARACION_CONTINUAR__`

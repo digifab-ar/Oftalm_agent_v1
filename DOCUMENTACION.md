@@ -497,6 +497,27 @@ Ambas coexisten sin conflictos y usan la misma infraestructura MQTT.
 
 ## 📡 Comunicación MQTT
 
+### Perfiles de velocidad del foróptero (firmware ESP32)
+
+**Archivo activo:** `reference_ESP32/Foroptero_v0_5_4_release_2/Foroptero_v0_5_4_release_2.ino`  
+**Baseline anterior (sin cambio de velocidad):** `reference_ESP32/Foroptero_v0_5_3_release_1/Foroptero_v0_5_3_release_1.ino`  
+**Plan:** `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.5.11 (Ítem 3 — Fase B)
+
+El firmware usa **AccelStepper** con dos perfiles de movimiento configurados en `setup()`:
+
+| Perfil | Constantes | maxSpeed | acceleration | Motores |
+|--------|------------|----------|--------------|---------|
+| **Esfera** | `ESFERA_MAX_SPEED`, `ESFERA_ACCELERATION` | **2400** | **1500** | Esférico R/L (`controlCD`, `controlCI`) |
+| **Otros** | `OTROS_MAX_SPEED`, `OTROS_ACCELERATION` | 800 | 500 | Cilindro, ángulo, oclusión (BD, BI, AD, AI, DD, DI) |
+
+- **Config validada (2026-07-06):** ×3,0 vs baseline 800/500. Banco: **~3,7 s / ±0,50 D**, **~2,6 s / ±0,25 D**. Sin limitación por TPM observada.
+- **Baseline v0.5.3:** ~7 s / 0,50 D (P4). **Objetivo Q5:** ≤ 3,5 s — cumplido en práctica (~3,7 s, −47 %).
+- **Evidencia:** `registros-examen/examen-registro-20.csv` vs `examen-registro-13.csv` — ver `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §4.0.10.
+- **Backend:** sin cambios; el protocolo MQTT y `esperar_foroptero` (timeout 10 s) son los mismos.
+- **Hardware:** NEMA17 (200 pasos/vuelta), microstepping 1/16, drivers A4988. Unidades AccelStepper: micropasos/s.
+
+Para tunear en banco, modificar solo las constantes `ESFERA_*` al inicio del `.ino` (escalones documentados en §2.5.11 del plan).
+
 ### Configuración
 
 - **Broker:** `mqtt://broker.hivemq.com`
