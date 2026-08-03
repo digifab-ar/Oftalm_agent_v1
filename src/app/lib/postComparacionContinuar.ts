@@ -87,8 +87,9 @@ export function attachPostComparacionContinuarHandlers(
 
   return () => {
     clearNudgeTimeout();
-    session.removeListener('agent_tool_end', onToolEnd);
-    session.removeListener('agent_tool_start', onToolStart);
-    session.removeListener('audio_stopped', onAudioStopped);
+    // Browser RuntimeEventEmitter exposes on/off (not Node removeListener).
+    session.off('agent_tool_end', onToolEnd);
+    session.off('agent_tool_start', onToolStart);
+    session.off('audio_stopped', onAudioStopped);
   };
 }

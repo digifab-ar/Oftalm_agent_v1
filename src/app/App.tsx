@@ -288,6 +288,8 @@ function App() {
     sendEvent({
       type: 'session.update',
       session: {
+        // GA Realtime requires session.type on every session.update.
+        type: 'realtime',
         audio: {
           input: {
             turn_detection: turnDetection,

@@ -41,9 +41,9 @@ function BottomToolbar({
   };
 
   function getConnectionButtonLabel() {
-    if (isConnected) return "Desconectado";
+    if (isConnected) return "Desconectar";
     if (isConnecting) return "Conectando...";
-    return "Connect";
+    return "Conectar";
   }
 
   function getConnectionButtonClasses() {

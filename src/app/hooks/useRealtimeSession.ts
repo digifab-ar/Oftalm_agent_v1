@@ -169,11 +169,22 @@ export function useRealtimeSession(callbacks: RealtimeSessionCallbacks = {}) {
   );
 
   const disconnect = useCallback(() => {
-    postComparacionCleanupRef.current?.();
-    postComparacionCleanupRef.current = null;
-    sessionRef.current?.close();
-    sessionRef.current = null;
-    updateStatus('DISCONNECTED');
+    try {
+      postComparacionCleanupRef.current?.();
+    } catch (err) {
+      console.warn('postComparacion cleanup failed during disconnect', err);
+    } finally {
+      postComparacionCleanupRef.current = null;
+    }
+
+    try {
+      sessionRef.current?.close();
+    } catch (err) {
+      console.warn('RealtimeSession.close failed during disconnect', err);
+    } finally {
+      sessionRef.current = null;
+      updateStatus('DISCONNECTED');
+    }
   }, [updateStatus]);
 
   const assertconnected = () => {
