@@ -3973,7 +3973,9 @@ function procesarRespuestaBinocular(respuestaPaciente, interpretacionComparacion
 }
 
 /**
- * Confirma el resultado final del test binocular (Rx completa por ojo)
+ * Confirma el resultado final del test binocular (Rx completa por ojo).
+ * Siempre despacha rxFinal al foróptero (anterior/actual/igual; no-op tolerado).
+ * Fire-and-forget: el mensaje de cierre puede emitirse en paralelo (D3).
  */
 function confirmarResultadoBinocular(rxFinal) {
   const resultados = estadoExamen.secuenciaExamen.resultados;
@@ -3983,6 +3985,17 @@ function confirmarResultadoBinocular(rxFinal) {
   resultados.L.binocular = { esfera: n.L.esfera, cilindro: n.L.cilindro, angulo: n.L.angulo };
 
   console.log(`✅ Resultado binocular confirmado:`, n);
+
+  // PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN — D1/D2: siempre rxFinal al foróptero al cerrar
+  if (ejecutarComandoForopteroInterno) {
+    const configForoptero = foropteroDesdeRx(n);
+    ejecutarComandoForopteroInterno(configForoptero).catch((err) => {
+      console.error(`⚠️ Error actualizando foróptero después de confirmar binocular:`, err);
+    });
+    console.log(`🔧 Foróptero actualizado con Rx binocular final:`, n);
+  } else {
+    console.warn('⚠️ ejecutarComandoForopteroInterno no inicializado; no se envió Rx binocular final');
+  }
 
   estadoExamen.binocularEstado = binocularEstadoVacio();
 
