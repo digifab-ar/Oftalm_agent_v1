@@ -5,9 +5,10 @@
 **Evidencia post-fix B1:** `registros-examen/examen-registro-15.csv` (2026-07-03 11:48–12:02)  
 **Evidencia pre-fix B4:** `registros-examen/examen-registro-15.csv` (l. 161–163 — ronda esférica no-op)  
 **Evidencia post-fix B4:** `registros-examen/examen-registro-16.csv` (2026-07-03 12:54–13:07)  
-**Estado:** **B1, B3 y B4 implementados y QA OK** (`fe7d53f`, `a7ca9ad`, `26a8d40`) — **B2 pendiente**  
+**Evidencia post-fix B2:** `registros-examen/examen-registro-22.csv` (2026-08-03 10:08–10:16)  
+**Estado:** **B1–B4 implementados y QA OK** (`fe7d53f`, `a7ca9ad`, `26a8d40`, `0163239`)  
 **Archivos principales afectados:** `reference/foroptero-server/motorExamen.js`  
-**Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3, §2.6.7, §4.0.6
+**Referencias:** `DEFINICIONES_EXAMEN_BINOCULAR.md`, `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §2.6.3, §2.6.7, §4.0.6; `PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md`
 
 ---
 
@@ -16,7 +17,7 @@
 | # | Bug | Severidad | Causa raíz (1 línea) |
 |---|-----|-----------|----------------------|
 | **B1** | Al entrar en binocular, la Rx del foróptero **no** coincide con los resultados monoculars | Alta clínica | `construirRxBaseBinocular` / `cilYAnguloOjo` exige cilindro **y** ángulo confirmados; si falta ángulo (`pendiente`), descarta el cilindro monocular y usa `valoresRecalculados` | ✅ **Cerrado** (`fe7d53f`, registro-15 §9) |
-| **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persiste resultados y avanza a `FINALIZADO` **sin** comando foróptero con la Rx elegida |
+| **B2** | Al decir «con la anterior» en la última prueba binocular, el examen finaliza pero el foróptero no refleja el resultado | Alta clínica | `confirmarResultadoBinocular` persistía resultados y avanzaba a `FINALIZADO` **sin** comando foróptero con la Rx elegida | ✅ **Cerrado** (`0163239`, registro-22; plan `PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md`) |
 | **B3** | Cilíndrico secuencial bajo paso 2: «con la anterior» elige −0,25 en vez de 0,0 | Alta clínica | Tras paso 1, `obtenerInstrucciones` asigna `valorAnterior = valorActual` (−0,25) en lugar de `candidatoPaso1` (0,0) | ✅ **Cerrado** (`a7ca9ad`, registro-14 §8) |
 | **B4** | Ronda binocular esférica o cilíndrica **sin contraste** (variante = base) igual se pregunta al paciente | Media UX / protocolo | Tras «listo», el motor siempre entra en `FB_ESF_MOSTRAR` aunque `aplicarVarianteEsferica` no cambie ningún ojo; §7 cilíndrico solo omite **después** de cerrar esfera | ✅ **Cerrado** (`26a8d40`, registro-16 §10) |
 
@@ -344,44 +345,15 @@ if (estado.cilindricoSecuencialBajo && estado.pasoSecuencialBajo === 2) {
 
 ---
 
-### Fase 2 — B2: foróptero al confirmar binocular
+### Fase 2 — B2: foróptero al confirmar binocular ✅ CERRADO
 
-**Archivo:** `reference/foroptero-server/motorExamen.js`
+**Archivo:** `reference/foroptero-server/motorExamen.js`  
+**Commit:** `0163239` — `fix(binocular): apply rxFinal to foropter on exam close`  
+**Plan de producto:** `PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md` (siempre `rxFinal`, fire-and-forget; mensaje de fin puede ir en paralelo).
 
-**Tarea 2.1 — Aplicar Rx final en `confirmarResultadoBinocular`**
+**Implementado:** en `confirmarResultadoBinocular`, tras persistir, siempre `ejecutarComandoForopteroInterno(foropteroDesdeRx(n))` (sin ramificar por preferencia).
 
-Opción recomendada (paridad ETAPA_5):
-
-```
-function confirmarResultadoBinocular(rxFinal) {
-  const n = normalizarRxPar(copiarRxPar(rxFinal));
-  // ... persistir resultados ...
-  if (ejecutarComandoForopteroInterno) {
-    await/ejecutar foropteroDesdeRx(n)  // ambos ojos open
-  }
-  // ... avanzarTest ...
-}
-```
-
-Considerar `esperar_foroptero` si el contrato del examen requiere ready antes de `FINALIZADO` (evaluar vs. patrón async de cilíndrico monocular).
-
-**Tarea 2.2 — Caso preferencia «anterior» en última ronda**
-
-Tras fix, al responder «anterior» en `FB_CIL_PREG`:
-
-1. `rxActiva = rxBasePaso`
-2. Foróptero se mueve a `rxBasePaso`
-3. Resultado CSV = `rxBasePaso`
-
-**Tarea 2.3 — QA manual**
-
-| Caso | Última respuesta | Foróptero post-examen | `resultados.*.binocular` |
-|------|------------------|----------------------|--------------------------|
-| A | «con la actual» | = variante | = variante |
-| B | «con la anterior» | = base del paso cilíndrico | = base del paso cilíndrico |
-| C | «igual» (→ anterior) | = base | = base |
-
-**Evidencia:** CSV con caso B explícito (registro-13 no lo cubre; hay que forzar respuesta «anterior» en ronda cilíndrica final).
+**QA:** caso B («anterior» en última ronda cilíndrica) — `registros-examen/examen-registro-22.csv` (2026-08-03). Resumen `Binocular (B)` = base del paso; hardware confirmado por operador. Ver `PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md` §12.
 
 ---
 
@@ -653,6 +625,8 @@ sequenceDiagram
 | `registros-examen/examen-registro-14.csv` | Evidencia post-fix B3 OK (§8); evidencia pre-fix B1 (l. 160 vs 186) |
 | `registros-examen/examen-registro-15.csv` | Evidencia post-fix B1 OK (§9); evidencia pre-fix **B4** (l. 161–163) |
 | `registros-examen/examen-registro-16.csv` | Evidencia post-fix B4 OK (§10) |
+| `registros-examen/examen-registro-22.csv` | Evidencia post-fix B2 OK (`PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md` §12) |
+| `PLAN_FEEDBACK_CLIENTE_BINOCULAR_FIN.md` | Definición D1–D4 + QA B2 |
 | `PLAN_FEEDBACK_CLIENTE_EXAMEN.md` §4.0.7, §4.0.8 | Cierre B1 y B4 |
 | `DEFINICIONES_EXAMEN_BINOCULAR.md` §2.1, §7 (B4) | Regla línea base (B1); omisión pasos no-op (B4) |
 | `reference/foroptero-server/motorExamen.js` | ~889–908 (B1), ~2031–2038 (B3), ~3832–3890 (B2/B4), ~3636–3651 (variantes) |
@@ -769,4 +743,4 @@ Escenario: cilíndrico OI confirmado **−0,50**; cilíndrico ángulo OI **pendi
 
 ---
 
-*Última actualización: 2026-07-03 — B1, B3 y B4 cerrados (registros 16, 15 y 14). **B2** pendiente.*
+*Última actualización: 2026-08-03 — **B1–B4 cerrados** (registros 16, 15, 14 y **22** para B2 / `0163239`).*

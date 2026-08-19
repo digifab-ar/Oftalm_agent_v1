@@ -1,10 +1,10 @@
 # Plan — Feedback cliente: lentes finales binocular en foróptero
 
 **Fecha:** 2026-08-03  
-**Estado:** definición de producto cerrada — **sin cambios de código en este documento**  
+**Estado:** **implementado + QA OK** — commit `0163239`; evidencia `registros-examen/examen-registro-22.csv`  
 **Alcance de implementación:** **solo** `reference/foroptero-server/motorExamen.js`. Cualquier otro archivo (docs, agente, UI, firmware) **no** se toca salvo **100 % necesario** y con **validación previa** del responsable.  
 **Relacionados:**  
-- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — bug **B2** (pendiente)  
+- `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — bug **B2** (cerrado con este fix)  
 - `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md` — regla §1 / §4.2–§4.4  
 - `DEFINICIONES_EXAMEN_BINOCULAR.md`  
 - `DOCUMENTACION.md` (FINALIZADO parcialmente implementado)
@@ -45,7 +45,7 @@ Al cerrar el binocular:
 | Preferencia última ronda | Rx lógica (`rxActiva` / `rxFinal`) | Comando foróptero al cierre |
 |--------------------------|------------------------------------|-----------------------------|
 | `actual` | `rxVariante` | **Siempre** `rxFinal` (aunque ya esté en cara) |
-| `anterior` | `rxBasePaso` | **Siempre** `rxFinal` (**hoy falta**; es el síntoma) |
+| `anterior` | `rxBasePaso` | **Siempre** `rxFinal` |
 | `igual` (→ `anterior`) | `rxBasePaso` | **Siempre** `rxFinal` |
 
 El paciente debe terminar el examen con el set de lentes resultado en el foróptero.
@@ -165,61 +165,33 @@ Paciente ve rxVariante (pregunta binocular)
 
 ---
 
-## 6. Propuesta de cambios (no implementar aún)
+## 6. Implementación (cerrada)
 
-### 6.1 Regla normativa (alineada a §0)
+### 6.1 Regla aplicada (§0)
 
-Al confirmar el resultado binocular (cualquier path a `confirmarResultadoBinocular` / cierre a `FINALIZADO`):
+Al confirmar el resultado binocular:
 
-1. Persistir `rxFinal` (como hoy).
-2. Seguir el flujo de cierre / mensaje de fin (como hoy).
-3. **Siempre** enviar al foróptero `foropteroDesdeRx(rxFinal)` — sin importar si la preferencia fue `anterior`, `actual` o `igual`, y sin omitir por no-op aparente (**D1**, **D2**).
-4. **No** exigir que el mensaje de fin espere al foróptero (**D3**). Orden aceptable: mensaje de cierre y, en el mismo cierre, comando foróptero (p. ej. fire-and-forget o pasos sin bloquear el `hablar` al agente).
+1. Persistir `rxFinal`.
+2. **Siempre** `ejecutarComandoForopteroInterno(foropteroDesdeRx(rxFinal))` — fire-and-forget (**D1–D3**).
+3. Reset estado + `avanzarTest()` → `FINALIZADO`.
 
-Sin ritual “Sigamos…”, sin deferred `postComparacionContinuar`, sin cambios de agente por este fix.
+Sin ritual “Sigamos…”, sin deferred, sin ramas por preferencia.
 
-### 6.2 Enganche en código (solo `motorExamen.js`)
+### 6.2 Enganche elegido
 
-| Opción | Dónde | Ajuste a decisiones §0 |
-|--------|-------|------------------------|
-| **A** | `obtenerInstrucciones`, rama `resultadoConfirmado` de ETAPA_6: tras (o junto a) el cierre, ejecutar siempre `foroptero` con `resultado.rxFinal` | Usa `rxFinal` del return; no depende de `binocularEstado` ya vaciado |
-| **B** | Dentro de `confirmarResultadoBinocular` vía `ejecutarComandoForopteroInterno(foropteroDesdeRx(n))` (paridad cilíndrico monocular) | Muy local; mensaje de fin puede ir en paralelo — **aceptable por D3** |
+**Opción B** en `confirmarResultadoBinocular` (`motorExamen.js`), paridad con confirmación cilíndrica monocular.
 
-**Recomendación bajo D1–D4:** **Opción B** o **A** son válidas; priorizar el cambio **mínimo** en `motorExamen.js`. No condicionar por preferencia ni por igualdad Rx. `esperar_foroptero` es **opcional** (no requerido por UX); incluirlo solo si conviene a la orquestación interna, no para reordenar el mensaje de fin.
+### 6.3 Commit
 
-### 6.3 Cambios concretos previstos
+| Campo | Valor |
+|-------|-------|
+| Commit | `0163239` |
+| Mensaje | `fix(binocular): apply rxFinal to foropter on exam close` |
+| Archivo código | `reference/foroptero-server/motorExamen.js` |
 
-1. **`motorExamen.js` — cierre binocular**  
-   - En el path `resultadoConfirmado` / `confirmarResultadoBinocular`: **siempre** despachar `foropteroDesdeRx(rxFinal)` (vía pasos o `ejecutarComandoForopteroInterno`).  
-   - Sin flags `necesitaReanclaje*`, sin ramas `anterior`/`actual`/`igual` para este comando.
+### 6.4 Nota sobre registro CSV
 
-2. **`confirmarResultadoBinocular`**  
-   - Seguir persistiendo y devolviendo `rxFinal`.  
-   - Si se elige Opción B: disparar el comando foróptero aquí (async OK por **D3**).  
-   - Si se elige Opción A: no hace falta reordenar reset/avance; la orquestación usa solo `resultado.rxFinal`.
-
-3. **Orden aceptado (D3)**
-
-```
-calcular rxFinal
-persistir resultados
-reset binocularEstado
-avanzarTest() → FINALIZADO
-mensaje de cierre (agente / flujo actual)
-+ siempre: comando foróptero con rxFinal  (puede solaparse o ir después del hablar)
-```
-
-4. **Fuera de alcance por defecto (D4)**  
-   - No tocar agente, Framer, firmware ni docs salvo necesidad 100 % y validación previa.  
-   - No implementar en este fix un case nuevo de `FINALIZADO` en `generarPasos()` (sigue opcional / aparte).  
-   - Actualizar `PLAN_FIX_…` B2 / docs solo si se pide explícitamente después del fix.
-
-### 6.4 Archivos a tocar
-
-| Archivo | ¿Se toca? |
-|---------|-----------|
-| `reference/foroptero-server/motorExamen.js` | **Sí** — único archivo de implementación |
-| Cualquier otro | **No**, salvo 100 % necesario + validación previa |
+El comando de cierre usa `ejecutarComandoForopteroInterno` **directo** (no pasa por `ejecutarPasosAutomaticamente`), por lo que el POC de registro **no** agrega una fila `Foroptero-TV` post-preferencia final. La validación de hardware es **operador +** coherencia `Binocular (B)` vs última variante en cara.
 
 ---
 
@@ -262,9 +234,8 @@ mensaje de cierre (agente / flujo actual)
 
 ## 10. Relación con trabajo previo
 
-Este feedback es el mismo defecto catalogado como **B2** en `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` (**pendiente**; B1/B3/B4 ya cerrados).  
-La regla general de reanclaje post-comparativa está en `PLAN_REANCLAJE_POST_COMPARATIVA_LENTES.md`, pero el **cierre** binocular quedó fuera del enganche implementado (solo esfera→cilindro con `reanclajeRxBinocularIntermedio`).  
-Este plan **simplifica** el cierre respecto de ese plan: no condicionar por preferencia; siempre `rxFinal` (**D1–D2**).
+Este feedback es el mismo defecto **B2** de `PLAN_FIX_BINOCULAR_CILINDRICO_REG13.md` — **cerrado** con `0163239` + registro-22.  
+Cierre binocular: siempre `rxFinal` (**D1–D2**), sin condicionar por preferencia.
 
 ---
 
@@ -272,10 +243,45 @@ Este plan **simplifica** el cierre respecto de ese plan: no condicionar por pref
 
 | Pregunta | Respuesta |
 |----------|-----------|
-| ¿El resultado lógico es correcto? | Sí — se guarda la Rx elegida |
-| ¿Por qué el foróptero no cambia? | No hay comando foróptero en el cierre binocular |
-| ¿Qué hay que hacer? | Al cerrar, **siempre** mandar `rxFinal` al foróptero (`anterior` / `actual` / `igual`) |
+| ¿Qué se hizo? | Al cerrar binocular, **siempre** `foropteroDesdeRx(rxFinal)` en `confirmarResultadoBinocular` |
 | ¿Mensaje de fin antes del movimiento? | OK (**D3**) |
-| ¿Qué archivos? | Solo `motorExamen.js` (**D4**) |
+| ¿Archivos de código? | Solo `motorExamen.js` (**D4**) |
+| ¿QA? | ✅ OK — `examen-registro-22.csv` (§12) |
 
-**Próximo paso de implementación (cuando se autorice):** cambio mínimo en `motorExamen.js` (Opción A o B §6.2) que, en todo path a `resultadoConfirmado` binocular, despache `foropteroDesdeRx(rxFinal)` sin condiciones de preferencia.
+---
+
+## 12. QA post-fix — `examen-registro-22`
+
+**Archivo:** `registros-examen/examen-registro-22.csv`  
+**Sesión:** 2026-08-03, 10:08–10:16 (exportado 10:16:37)  
+**Modo:** `normal` → `FINALIZADO`  
+**Valores iniciales:** `<R> +0.25, -0.50, 175 / <L> +0.50, -1.50, 20`  
+**Valores recalculados:** `<R> +0.25 , +0.00 , 175 / <L> +0.50 , -1.00 , 20`  
+**Commit bajo prueba:** `0163239`  
+**Resultado operador:** ✅ funciona correctamente (foróptero queda en Rx resultado tras «anterior»).
+
+### 12.1 Tramo binocular (síntoma B2 ejercitado)
+
+| Timestamp | Evento | Foróptero / detalle |
+|-----------|--------|---------------------|
+| 10:15:24 | Entrada ETAPA_6 (ambos open) | R `+0.00 / −0.25 @175°`; L `+0.75 / −1.00 @20°` |
+| 10:15:38 | «listo» → variante **esférica** | L Esf `+0.75 → +0.25` |
+| 10:15:54 | Paciente «el nuevo» (`actual`) | — |
+| 10:15:54 | Variante **cilíndrica** (en cara al preguntar) | R Cil `−0.25 → 0`; L Cil `−1.00 → −0.50` |
+| 10:16:19 | Paciente «el anterior» (`anterior`) | **Caso gatillo** — cierra examen |
+| — | Resumen `Binocular (B)` | R `+0.00 / −0.25 @175°`; L `+0.25 / −1.00 @20°` |
+
+### 12.2 Criterio de aceptación
+
+| Check | Esperado | Observado |
+|-------|----------|-----------|
+| Preferencia última ronda | `anterior` | ✅ l. 177–178 |
+| `rxFinal` persistida | = base del paso cilíndrico (no la variante en cara) | ✅ R Cil **−0.25**, L Cil **−1.00** (no 0 / −0.50) |
+| Hardware post-cierre | = `rxFinal` | ✅ confirmado por operador |
+| Fila `Foroptero-TV` tras 10:16:19 | Puede **no** aparecer (fire-and-forget fuera de `ejecutarPasosAutomaticamente`) | ⚠️ ausente en CSV — esperado §6.4 |
+
+**Contraste pre-fix (diseño B2):** con «anterior» el resumen ya guardaba la base, pero el foróptero quedaba en la variante. Post-fix el hardware sigue la Rx del resumen.
+
+### 12.3 Resultado
+
+✅ **Cerrado** — fix `0163239` validado con CSV archivado + confirmación de campo.
